@@ -78,14 +78,17 @@ RETRY:
 		vecQ[i].Mul(b0, coeff_base[i])
 		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, coeff_base[i]))
 		vecQ[i+2].Add(vecQ[i+2], coeff_base[i])
-	}
 
-	// mod vectors
-	for i := 0; i < order+1; i++ {
 		vecP[i].Mod(vecP[i], prime)
+		vecP[i+1].Mod(vecP[i+1], prime)
+		vecP[i+2].Mod(vecP[i+2], prime)
+
 		vecQ[i].Mod(vecQ[i], prime)
+		vecQ[i+1].Mod(vecQ[i+1], prime)
+		vecQ[i+2].Mod(vecQ[i+2], prime)
 	}
 
+	//fmt.Println(vecP[0], bigInt.Mod(bigInt.Mul(a0, coeff_base[0]), prime))
 	return &DPPK{
 		s0:    coeff_base[0],
 		a0:    a0,
