@@ -2,6 +2,7 @@ package dppk
 
 import (
 	"crypto/rand"
+	"errors"
 	"math/big"
 )
 
@@ -19,11 +20,10 @@ type DPPK struct {
 
 // NewDPPK creates a new DPPK instance with the given order.
 func NewDPPK(order int) (*DPPK, error) {
-	prime, _ := big.NewInt(0).SetString(PRIME, 10)
-	s0, err := rand.Int(rand.Reader, prime)
-	if err != nil {
-		return nil, err
+	if order < 5 {
+		return nil, errors.New("order must be at least 5")
 	}
+	prime, _ := big.NewInt(0).SetString(PRIME, 10)
 
 RETRY:
 	a0, err := rand.Int(rand.Reader, prime)
@@ -51,8 +51,43 @@ RETRY:
 		goto RETRY
 	}
 
+	// coefficients s
+	coeff_base := make([]*big.Int, order+1)
+	for i := 0; i < len(coeff_base); i++ {
+		r, err := rand.Int(rand.Reader, prime)
+		if err != nil {
+			return nil, err
+		}
+		coeff_base[i] = r
+	}
+
+	vecP := make([]*big.Int, order+3)
+	vecQ := make([]*big.Int, order+3)
+	for i := 0; i < order+3; i++ {
+		vecP[i] = big.NewInt(0)
+		vecQ[i] = big.NewInt(0)
+	}
+
+	bigInt := new(big.Int)
+
+	for i := 0; i < order+1; i++ {
+		vecP[i].Mul(a0, coeff_base[i])
+		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, coeff_base[i]))
+		vecP[i+2].Add(vecP[i+2], coeff_base[i])
+
+		vecQ[i].Mul(b0, coeff_base[i])
+		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, coeff_base[i]))
+		vecQ[i+2].Add(vecQ[i+2], coeff_base[i])
+	}
+
+	// mod vectors
+	for i := 0; i < order+1; i++ {
+		vecP[i].Mod(vecP[i], prime)
+		vecQ[i].Mod(vecQ[i], prime)
+	}
+
 	return &DPPK{
-		s0:    s0,
+		s0:    coeff_base[0],
 		a0:    a0,
 		a1:    a1,
 		b0:    b0,
