@@ -3,7 +3,6 @@ package dppk
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 )
 
@@ -119,7 +118,6 @@ RETRY:
 	// remove v0 and v(N+2)
 	priv.PublicKey.VectorP = vecP[1 : order+2]
 	priv.PublicKey.VectorQ = vecQ[1 : order+2]
-	fmt.Println(priv.PublicKey.VectorP[len(priv.PublicKey.VectorP)-1])
 	priv.PublicKey.Prime = prime
 	return priv, nil
 }
@@ -160,13 +158,11 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 	return Ps, Qs, nil
 }
 
-func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error) {
+func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
 	Ps.Add(Ps, dppk.s0a0)
 	Ps.Mod(Ps, dppk.PublicKey.Prime)
 	Qs.Add(Qs, dppk.s0b0)
 	Qs.Mod(Qs, dppk.PublicKey.Prime)
-	fmt.Println("Ps", Ps)
-	fmt.Println("Qs", Qs)
 
 	// As:
 	// 	Ps := Bn * (x^2 + a1x + a0) mod p
@@ -206,9 +202,6 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	c.Add(a0Qs, revb0Ps)
 	c.Mod(c, dppk.PublicKey.Prime)
 
-	fmt.Println("a,b,c", a, b, c)
-	fmt.Println("a0b0", dppk.a0, dppk.a1, dppk.b0, dppk.b1)
-
 	bsquared := new(big.Int).Mul(b, b)
 	bsquared.Mod(bsquared, dppk.PublicKey.Prime)
 
@@ -221,7 +214,6 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 
 	// solve quadratic equation
 	root := new(big.Int).ModSqrt(squared, dppk.PublicKey.Prime)
-	fmt.Println("root:", &root)
 
 	// div 2a
 	inv2a := big.NewInt(2)
@@ -232,17 +224,15 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
 
 	revRoot := new(big.Int).Sub(dppk.PublicKey.Prime, root)
-	x1 := big.NewInt(0).Add(negb, revRoot)
+	x1 = big.NewInt(0).Add(negb, revRoot)
 	x1.Mod(x1, dppk.PublicKey.Prime)
 	x1.Mul(x1, inv2a)
 	x1.Mod(x1, dppk.PublicKey.Prime)
 
-	x2 := big.NewInt(0).Add(negb, root)
+	x2 = big.NewInt(0).Add(negb, root)
 	x2.Mod(x2, dppk.PublicKey.Prime)
 	x2.Mul(x2, inv2a)
 	x2.Mod(x2, dppk.PublicKey.Prime)
 
-	fmt.Println("x1:", x1.Int64())
-	fmt.Println("x2:", x2.Int64())
-	return nil, nil
+	return x1, x2, nil
 }
