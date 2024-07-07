@@ -169,20 +169,19 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	fmt.Println("Qs", Qs)
 
 	// As:
-	// 	Ps := Bn * (x^2 + a1x + a0)
-	// 	Qs := Bn * (x^2 + b1x + b0)
+	// 	Ps := Bn * (x^2 + a1x + a0) mod p
+	// 	Qs := Bn * (x^2 + b1x + b0) mod p
 	//
 	// We have:
-	// 	Ps*revBn(s):= (x^2 + a1x + a0)
-	// 	Qs*revBn(s):= (x^2 + b1x + b0)
+	// 	Ps*revBn(s):= (x^2 + a1x + a0) mod p
+	// 	Qs*revBn(s):= (x^2 + b1x + b0) mod p
 	//
 	// Then:
-	// 	Ps* Qs * revBn(s):= (x^2 + a1x + a0) * Qs
-	// 	Ps* Qs * revBn(s):= (x^2 + b1x + b0) * Ps
+	// 	Ps* Qs * revBn(s):= (x^2 + a1x + a0) * Qs mod p
+	// 	Ps* Qs * revBn(s):= (x^2 + b1x + b0) * Ps mod p
 	//
-	// Solve:
-	//
-	// 	(x^2 + a1x + a0) * Qs  == (x^2 + b1x + b0) * Ps
+	// Solve this equation to get x
+	// 	(x^2 + a1x + a0) * Qs  == (x^2 + b1x + b0) * Ps modp
 
 	// the following procedure will be formalized to :
 	// ax^2 + bx + c = 0
