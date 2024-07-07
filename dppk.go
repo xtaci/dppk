@@ -3,16 +3,20 @@ package dppk
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 )
 
 // PRIME is the prime number used in the DPPK protocol.
-const PRIME = "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853611059596231637"
+//const PRIME = "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853611059596231637"
+
+const PRIME = "997"
 
 // PrivateKey
 type PrivateKey struct {
 	s0             *big.Int
 	a0, a1, b0, b1 *big.Int
+	s0a0, s0b0     *big.Int
 	PublicKey
 }
 
@@ -57,7 +61,7 @@ RETRY:
 
 	// Bn(X)
 	// coefficients s
-	coeff_base := make([]*big.Int, order+1)
+	coeff_base := make([]*big.Int, order)
 	for i := 0; i < len(coeff_base); i++ {
 		r, err := rand.Int(rand.Reader, prime)
 		if err != nil {
@@ -65,6 +69,8 @@ RETRY:
 		}
 		coeff_base[i] = r
 	}
+	// the coefficient of x^n is 1
+	coeff_base = append(coeff_base, big.NewInt(1))
 
 	// vecP and vecQ
 	vecP := make([]*big.Int, order+3)
@@ -76,58 +82,202 @@ RETRY:
 
 	bigInt := new(big.Int)
 
+	//  x^2 + a1x + a0
 	for i := 0; i < order+1; i++ {
-		vecP[i].Mul(a0, coeff_base[i])
-		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, coeff_base[i]))
-		vecP[i+2].Add(vecP[i+2], coeff_base[i])
-
-		vecQ[i].Mul(b0, coeff_base[i])
-		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, coeff_base[i]))
-		vecQ[i+2].Add(vecQ[i+2], coeff_base[i])
-
+		// vector P
+		vecP[i].Add(vecP[i], bigInt.Mul(a0, coeff_base[i]))
 		vecP[i].Mod(vecP[i], prime)
+
+		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, coeff_base[i]))
 		vecP[i+1].Mod(vecP[i+1], prime)
+
+		vecP[i+2].Add(vecP[i+2], coeff_base[i])
 		vecP[i+2].Mod(vecP[i+2], prime)
 
+		// vector Q
+		vecQ[i].Add(vecQ[i], bigInt.Mul(b0, coeff_base[i]))
 		vecQ[i].Mod(vecQ[i], prime)
+
+		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, coeff_base[i]))
 		vecQ[i+1].Mod(vecQ[i+1], prime)
+
+		vecQ[i+2].Add(vecQ[i+2], coeff_base[i])
 		vecQ[i+2].Mod(vecQ[i+2], prime)
 	}
 
 	//fmt.Println(vecP[0], bigInt.Mod(bigInt.Mul(a0, coeff_base[0]), prime))
 	priv := &PrivateKey{
-		s0: coeff_base[0],
-		a0: a0,
-		a1: a1,
-		b0: b0,
-		b1: b1,
+		s0:   coeff_base[0],
+		a0:   a0,
+		a1:   a1,
+		b0:   b0,
+		b1:   b1,
+		s0a0: vecP[0],
+		s0b0: vecQ[0],
 	}
+
+	// remove v0 and v(N+2)
 	priv.PublicKey.VectorP = vecP[1 : order+2]
 	priv.PublicKey.VectorQ = vecQ[1 : order+2]
+	fmt.Println(priv.PublicKey.VectorP[len(priv.PublicKey.VectorP)-1])
 	priv.PublicKey.Prime = prime
 	return priv, nil
 }
 
-func (dppk *PrivateKey) Encrypt(pk PublicKey, msg []byte) (Ps []byte, Qs []byte, err error) {
-	data := new(big.Int).SetBytes(msg)
-	if data.Cmp(dppk.PublicKey.Prime) >= 0 {
+func (dppk *PrivateKey) Encrypt(pk PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+	secret := new(big.Int).SetBytes(msg)
+	if secret.Cmp(dppk.PublicKey.Prime) >= 0 {
 		return nil, nil, errors.New("data is too large")
 	}
+	vecP := make([]*big.Int, len(dppk.PublicKey.VectorP)+1)
+	vecQ := make([]*big.Int, len(dppk.PublicKey.VectorQ)+1)
+	copy(vecP, pk.VectorP)
+	copy(vecQ, pk.VectorQ)
+	vecP[len(vecP)-1] = big.NewInt(1)
+	vecQ[len(vecQ)-1] = big.NewInt(1)
 
-	ps := new(big.Int)
+	Ps = big.NewInt(0)
+	Qs = big.NewInt(0)
+	Si := new(big.Int).Set(secret)
+	UiSi := new(big.Int)
+	ViSi := new(big.Int)
+	for i := range vecP {
+		UiSi.Mul(Si, vecP[i])
+		UiSi.Mod(UiSi, pk.Prime)
+		Ps.Add(Ps, UiSi)
+		Ps.Mod(Ps, pk.Prime)
+
+		ViSi.Mul(Si, vecQ[i])
+		ViSi.Mod(ViSi, pk.Prime)
+		Qs.Add(Qs, ViSi)
+		Qs.Mod(Qs, pk.Prime)
+
+		Si.Mul(Si, secret)
+		Si.Mod(Si, pk.Prime)
+	}
+
+	return Ps, Qs, nil
+}
+
+func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error) {
+	Ps.Add(Ps, dppk.s0a0)
+	Ps.Mod(Ps, dppk.PublicKey.Prime)
+	Qs.Add(Qs, dppk.s0b0)
+	Qs.Mod(Qs, dppk.PublicKey.Prime)
+
+	// Ps = k * Qs
+	revQs := new(big.Int)
+	revQs.ModInverse(Qs, dppk.PublicKey.Prime)
+
+	k := new(big.Int)
+	k.Mul(revQs, Ps)
+	k.Mod(k, dppk.PublicKey.Prime)
+
+	// retrieve coefficients for ax^2 + bx + c = 0
+	// a0 is c, a1 is b
+	// k(x^2 + b1x + b0) = x^2 + a1x + a0
+	// k*Qs == Ps mod p
 	bigInt := new(big.Int)
-	for i := range pk.VectorP {
-		bigInt.Exp(data, big.NewInt(int64(i)), pk.Prime)
-		bigInt.Mul(bigInt, pk.VectorP[i])
-		ps.Mod(bigInt.Add(ps, bigInt), pk.Prime)
+	a := new(big.Int).Set(bigInt.Add(k, bigInt.Sub(dppk.PublicKey.Prime, big.NewInt(1))))
+	b := new(big.Int)
+	c := new(big.Int)
+
+	// +- inverse
+	invA1 := new(big.Int).Sub(dppk.PublicKey.Prime, dppk.a1)
+	invA0 := new(big.Int).Sub(dppk.PublicKey.Prime, dppk.a0)
+
+	b.Add(bigInt.Mul(dppk.b1, k), invA1)
+	b.Mod(b, dppk.PublicKey.Prime)
+	c.Add(bigInt.Mul(dppk.b0, k), invA0)
+	c.Mod(c, dppk.PublicKey.Prime)
+
+	fmt.Println("abc:", a, b, c)
+
+	// -b + sqrt(b^2 - 4ac)
+	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
+
+	bsquared := new(big.Int).Mul(b, b)
+	bsquared.Mod(bsquared, dppk.PublicKey.Prime)
+
+	fourac := new(big.Int).Mul(big.NewInt(4), big.NewInt(0).Mul(a, c))
+	fourac = fourac.Mod(fourac, dppk.PublicKey.Prime)
+
+	squared := big.NewInt(0).Add(bsquared, bigInt.Sub(dppk.PublicKey.Prime, fourac))
+	squared = squared.Mod(squared, dppk.PublicKey.Prime)
+
+	// solve quadratic equation
+	root1, root2, _ := sqrt(*squared, *dppk.PublicKey.Prime)
+	fmt.Println("roots:", &root1)
+	fmt.Println("roots:", &root2)
+
+	modInverse2a := big.NewInt(0)
+	modInverse2a.Mul(big.NewInt(2), a)
+	modInverse2a.ModInverse(modInverse2a, dppk.PublicKey.Prime)
+
+	x := big.NewInt(0).Add(negb, &root1)
+	x = x.Mod(x.Mul(x, modInverse2a), dppk.PublicKey.Prime)
+
+	y := big.NewInt(0).Add(negb, &root2)
+	y = y.Mod(y.Mul(y, modInverse2a), dppk.PublicKey.Prime)
+
+	fmt.Println("X:", string(x.Bytes()))
+	fmt.Println("Y:", string(y.Bytes()))
+	return nil, nil
+}
+
+func inverse(a *big.Int, n *big.Int) *big.Int {
+	t := big.NewInt(0)
+	newt := big.NewInt(1)
+	r := big.NewInt(0).Set(n)
+	newr := big.NewInt(0).Set(a)
+
+	for newr.Cmp(big.NewInt(0)) != 0 {
+		quotient := new(big.Int).Div(r, newr)
+		t, newt = newt, t.Sub(t, newt.Mul(quotient, newt))
+		r, newr = newr, r.Sub(r, newr.Mul(quotient, newr))
 	}
 
-	qs := new(big.Int)
-	for i := range pk.VectorQ {
-		bigInt.Exp(data, big.NewInt(int64(i)), pk.Prime)
-		bigInt.Mul(bigInt, pk.VectorQ[i])
-		qs.Mod(bigInt.Add(qs, bigInt), pk.Prime)
+	if r.Cmp(big.NewInt(1)) == 0 {
+		if t.Cmp(big.NewInt(0)) < 0 {
+			t.Add(t, n)
+		}
 	}
 
-	return ps.Bytes(), qs.Bytes(), nil
+	return t //t.Mod(t, n)
+}
+
+func sqrt(n, p big.Int) (R1, R2 big.Int, ok bool) {
+	if big.Jacobi(&n, &p) != 1 {
+		fmt.Println("error")
+		return
+	}
+	var one, a, ω2 big.Int
+	one.SetInt64(1)
+	for ; ; a.Add(&a, &one) {
+		// big.Int Mod uses Euclidean division, result is always >= 0
+		ω2.Mod(ω2.Sub(ω2.Mul(&a, &a), &n), &p)
+		if big.Jacobi(&ω2, &p) == -1 {
+			break
+		}
+	}
+	type point struct{ x, y big.Int }
+	mul := func(a, b point) (z point) {
+		var w big.Int
+		z.x.Mod(z.x.Add(z.x.Mul(&a.x, &b.x), w.Mul(w.Mul(&a.y, &a.y), &ω2)), &p)
+		z.y.Mod(z.y.Add(z.y.Mul(&a.x, &b.y), w.Mul(&b.x, &a.y)), &p)
+		return
+	}
+	var r, s point
+	r.x.SetInt64(1)
+	s.x.Set(&a)
+	s.y.SetInt64(1)
+	var e big.Int
+	for e.Rsh(e.Add(&p, &one), 1); len(e.Bits()) > 0; e.Rsh(&e, 1) {
+		if e.Bit(0) == 1 {
+			r = mul(r, s)
+		}
+		s = mul(s, s)
+	}
+	R2.Sub(&p, &r.x)
+	return r.x, R2, true
 }
