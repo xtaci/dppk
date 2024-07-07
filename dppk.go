@@ -60,17 +60,17 @@ RETRY:
 	}
 
 	// Bn(X)
-	// coefficients s
-	coeff_base := make([]*big.Int, order)
-	for i := 0; i < len(coeff_base); i++ {
+	// coefficients s^0 --> s^N
+	Bn := make([]*big.Int, order)
+	for i := 0; i < len(Bn); i++ {
 		r, err := rand.Int(rand.Reader, prime)
 		if err != nil {
 			return nil, err
 		}
-		coeff_base[i] = r
+		Bn[i] = r
 	}
 	// the coefficient of x^n is 1
-	coeff_base = append(coeff_base, big.NewInt(1))
+	Bn = append(Bn, big.NewInt(1))
 
 	// vecP and vecQ
 	vecP := make([]*big.Int, order+3)
@@ -85,29 +85,29 @@ RETRY:
 	//  x^2 + a1x + a0
 	for i := 0; i < order+1; i++ {
 		// vector P
-		vecP[i].Add(vecP[i], bigInt.Mul(a0, coeff_base[i]))
+		vecP[i].Add(vecP[i], bigInt.Mul(a0, Bn[i]))
 		vecP[i].Mod(vecP[i], prime)
 
-		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, coeff_base[i]))
+		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, Bn[i]))
 		vecP[i+1].Mod(vecP[i+1], prime)
 
-		vecP[i+2].Add(vecP[i+2], coeff_base[i])
+		vecP[i+2].Add(vecP[i+2], Bn[i])
 		vecP[i+2].Mod(vecP[i+2], prime)
 
 		// vector Q
-		vecQ[i].Add(vecQ[i], bigInt.Mul(b0, coeff_base[i]))
+		vecQ[i].Add(vecQ[i], bigInt.Mul(b0, Bn[i]))
 		vecQ[i].Mod(vecQ[i], prime)
 
-		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, coeff_base[i]))
+		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, Bn[i]))
 		vecQ[i+1].Mod(vecQ[i+1], prime)
 
-		vecQ[i+2].Add(vecQ[i+2], coeff_base[i])
+		vecQ[i+2].Add(vecQ[i+2], Bn[i])
 		vecQ[i+2].Mod(vecQ[i+2], prime)
 	}
 
 	//fmt.Println(vecP[0], bigInt.Mod(bigInt.Mul(a0, coeff_base[0]), prime))
 	priv := &PrivateKey{
-		s0:   coeff_base[0],
+		s0:   Bn[0],
 		a0:   a0,
 		a1:   a1,
 		b0:   b0,
@@ -124,7 +124,7 @@ RETRY:
 	return priv, nil
 }
 
-func (dppk *PrivateKey) Encrypt(pk PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	secret := new(big.Int).SetBytes(msg)
 	if secret.Cmp(dppk.PublicKey.Prime) >= 0 {
 		return nil, nil, errors.New("data is too large")
@@ -141,6 +141,7 @@ func (dppk *PrivateKey) Encrypt(pk PublicKey, msg []byte) (Ps *big.Int, Qs *big.
 	Si := new(big.Int).Set(secret)
 	UiSi := new(big.Int)
 	ViSi := new(big.Int)
+
 	for i := range vecP {
 		UiSi.Mul(Si, vecP[i])
 		UiSi.Mod(UiSi, pk.Prime)
@@ -169,6 +170,7 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	revQs := new(big.Int)
 	revQs.ModInverse(Qs, dppk.PublicKey.Prime)
 
+	// k := Ps * revQs
 	k := new(big.Int)
 	k.Mul(revQs, Ps)
 	k.Mod(k, dppk.PublicKey.Prime)
@@ -179,6 +181,7 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	// k*Qs == Ps mod p
 	bigInt := new(big.Int)
 	a := new(big.Int).Set(bigInt.Add(k, bigInt.Sub(dppk.PublicKey.Prime, big.NewInt(1))))
+	a.Mod(a, dppk.PublicKey.Prime)
 	b := new(big.Int)
 	c := new(big.Int)
 
@@ -207,11 +210,11 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 
 	// solve quadratic equation
 	root1, root2, _ := sqrt(*squared, *dppk.PublicKey.Prime)
-	fmt.Println("roots:", &root1)
-	fmt.Println("roots:", &root2)
+	fmt.Println("root1:", &root1)
+	fmt.Println("root2:", &root2)
 
-	modInverse2a := big.NewInt(0)
-	modInverse2a.Mul(big.NewInt(2), a)
+	modInverse2a := big.NewInt(2)
+	modInverse2a.Mul(modInverse2a, a)
 	modInverse2a.ModInverse(modInverse2a, dppk.PublicKey.Prime)
 
 	x := big.NewInt(0).Add(negb, &root1)
@@ -220,50 +223,28 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	y := big.NewInt(0).Add(negb, &root2)
 	y = y.Mod(y.Mul(y, modInverse2a), dppk.PublicKey.Prime)
 
-	fmt.Println("X:", string(x.Bytes()))
-	fmt.Println("Y:", string(y.Bytes()))
+	fmt.Println("X:", x.Int64())
+	fmt.Println("Y:", y.Int64())
 	return nil, nil
-}
-
-func inverse(a *big.Int, n *big.Int) *big.Int {
-	t := big.NewInt(0)
-	newt := big.NewInt(1)
-	r := big.NewInt(0).Set(n)
-	newr := big.NewInt(0).Set(a)
-
-	for newr.Cmp(big.NewInt(0)) != 0 {
-		quotient := new(big.Int).Div(r, newr)
-		t, newt = newt, t.Sub(t, newt.Mul(quotient, newt))
-		r, newr = newr, r.Sub(r, newr.Mul(quotient, newr))
-	}
-
-	if r.Cmp(big.NewInt(1)) == 0 {
-		if t.Cmp(big.NewInt(0)) < 0 {
-			t.Add(t, n)
-		}
-	}
-
-	return t //t.Mod(t, n)
 }
 
 func sqrt(n, p big.Int) (R1, R2 big.Int, ok bool) {
 	if big.Jacobi(&n, &p) != 1 {
-		fmt.Println("error")
 		return
 	}
-	var one, a, ω2 big.Int
+	var one, a, w big.Int
 	one.SetInt64(1)
 	for ; ; a.Add(&a, &one) {
 		// big.Int Mod uses Euclidean division, result is always >= 0
-		ω2.Mod(ω2.Sub(ω2.Mul(&a, &a), &n), &p)
-		if big.Jacobi(&ω2, &p) == -1 {
+		w.Mod(w.Sub(w.Mul(&a, &a), &n), &p)
+		if big.Jacobi(&w, &p) == -1 {
 			break
 		}
 	}
 	type point struct{ x, y big.Int }
 	mul := func(a, b point) (z point) {
 		var w big.Int
-		z.x.Mod(z.x.Add(z.x.Mul(&a.x, &b.x), w.Mul(w.Mul(&a.y, &a.y), &ω2)), &p)
+		z.x.Mod(z.x.Add(z.x.Mul(&a.x, &b.x), w.Mul(w.Mul(&a.y, &a.y), &w)), &p)
 		z.y.Mod(z.y.Add(z.y.Mul(&a.x, &b.y), w.Mul(&b.x, &a.y)), &p)
 		return
 	}
