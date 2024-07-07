@@ -220,9 +220,8 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	squared.Mod(squared, dppk.PublicKey.Prime)
 
 	// solve quadratic equation
-	root1, root2, _ := sqrt(*squared, *dppk.PublicKey.Prime)
-	fmt.Println("root1:", &root1)
-	fmt.Println("root2:", &root2)
+	root := new(big.Int).ModSqrt(squared, dppk.PublicKey.Prime)
+	fmt.Println("root:", &root)
 
 	// div 2a
 	inv2a := big.NewInt(2)
@@ -232,13 +231,13 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 
 	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
 
-	revRoot := new(big.Int).Sub(dppk.PublicKey.Prime, &root1)
+	revRoot := new(big.Int).Sub(dppk.PublicKey.Prime, root)
 	x1 := big.NewInt(0).Add(negb, revRoot)
 	x1.Mod(x1, dppk.PublicKey.Prime)
 	x1.Mul(x1, inv2a)
 	x1.Mod(x1, dppk.PublicKey.Prime)
 
-	x2 := big.NewInt(0).Add(negb, &root2)
+	x2 := big.NewInt(0).Add(negb, root)
 	x2.Mod(x2, dppk.PublicKey.Prime)
 	x2.Mul(x2, inv2a)
 	x2.Mod(x2, dppk.PublicKey.Prime)
@@ -246,39 +245,4 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	fmt.Println("x1:", x1.Int64())
 	fmt.Println("x2:", x2.Int64())
 	return nil, nil
-}
-
-func sqrt(n, p big.Int) (R1, R2 big.Int, ok bool) {
-	if big.Jacobi(&n, &p) != 1 {
-		return
-	}
-	var one, a, w big.Int
-	one.SetInt64(1)
-	for ; ; a.Add(&a, &one) {
-		// big.Int Mod uses Euclidean division, result is always >= 0
-		w.Mod(w.Sub(w.Mul(&a, &a), &n), &p)
-		if big.Jacobi(&w, &p) == -1 {
-			break
-		}
-	}
-	type point struct{ x, y big.Int }
-	mul := func(a, b point) (z point) {
-		var w big.Int
-		z.x.Mod(z.x.Add(z.x.Mul(&a.x, &b.x), w.Mul(w.Mul(&a.y, &a.y), &w)), &p)
-		z.y.Mod(z.y.Add(z.y.Mul(&a.x, &b.y), w.Mul(&b.x, &a.y)), &p)
-		return
-	}
-	var r, s point
-	r.x.SetInt64(1)
-	s.x.Set(&a)
-	s.y.SetInt64(1)
-	var e big.Int
-	for e.Rsh(e.Add(&p, &one), 1); len(e.Bits()) > 0; e.Rsh(&e, 1) {
-		if e.Bit(0) == 1 {
-			r = mul(r, s)
-		}
-		s = mul(s, s)
-	}
-	R2.Sub(&p, &r.x)
-	return r.x, R2, true
 }
