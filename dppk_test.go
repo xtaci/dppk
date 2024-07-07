@@ -23,3 +23,12 @@ func TestDPPK(t *testing.T) {
 	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
 	assert.True(t, equal)
 }
+
+func BenchmarkDPPK(b *testing.B) {
+	dppk, _ := GenerateKey(5)
+	secret := []byte("hello quantum")
+	Ps, Qs, _ := dppk.Encrypt(&dppk.PublicKey, secret)
+	for i := 0; i < b.N; i++ {
+		dppk.Decrypt(Ps, Qs)
+	}
+}

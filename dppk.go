@@ -158,7 +158,9 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 	return Ps, Qs, nil
 }
 
-func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
+func (dppk *PrivateKey) Decrypt(inPs *big.Int, inQs *big.Int) (x1, x2 *big.Int, err error) {
+	Ps := new(big.Int).Set(inPs)
+	Qs := new(big.Int).Set(inQs)
 	Ps.Add(Ps, dppk.s0a0)
 	Ps.Mod(Ps, dppk.PublicKey.Prime)
 	Qs.Add(Qs, dppk.s0b0)
