@@ -165,48 +165,60 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	Ps.Mod(Ps, dppk.PublicKey.Prime)
 	Qs.Add(Qs, dppk.s0b0)
 	Qs.Mod(Qs, dppk.PublicKey.Prime)
+	fmt.Println("Ps", Ps)
+	fmt.Println("Qs", Qs)
 
-	// Ps = k * Qs
-	revQs := new(big.Int)
-	revQs.ModInverse(Qs, dppk.PublicKey.Prime)
+	// As:
+	// 	Ps := Bn * (x^2 + a1x + a0)
+	// 	Qs := Bn * (x^2 + b1x + b0)
+	//
+	// We have:
+	// 	Ps*revBn(s):= (x^2 + a1x + a0)
+	// 	Qs*revBn(s):= (x^2 + b1x + b0)
+	//
+	// Then:
+	// 	Ps* Qs * revBn(s):= (x^2 + a1x + a0) * Qs
+	// 	Ps* Qs * revBn(s):= (x^2 + b1x + b0) * Ps
+	//
+	// Solve:
+	//
+	// 	(x^2 + a1x + a0) * Qs  == (x^2 + b1x + b0) * Ps
 
-	// k := Ps * revQs
-	k := new(big.Int)
-	k.Mul(revQs, Ps)
-	k.Mod(k, dppk.PublicKey.Prime)
-
-	// retrieve coefficients for ax^2 + bx + c = 0
-	// a0 is c, a1 is b
-	// k(x^2 + b1x + b0) = x^2 + a1x + a0
-	// k*Qs == Ps mod p
-	bigInt := new(big.Int)
-	a := new(big.Int).Set(bigInt.Add(k, bigInt.Sub(dppk.PublicKey.Prime, big.NewInt(1))))
+	// the following procedure will be formalized to :
+	// ax^2 + bx + c = 0
+	a := new(big.Int)
+	revPs := new(big.Int).Sub(dppk.PublicKey.Prime, Ps)
+	a.Add(Qs, revPs)
 	a.Mod(a, dppk.PublicKey.Prime)
+
 	b := new(big.Int)
-	c := new(big.Int)
-
-	// +- inverse
-	invA1 := new(big.Int).Sub(dppk.PublicKey.Prime, dppk.a1)
-	invA0 := new(big.Int).Sub(dppk.PublicKey.Prime, dppk.a0)
-
-	b.Add(bigInt.Mul(dppk.b1, k), invA1)
+	a1Qs := new(big.Int).Mul(Qs, dppk.a1)
+	b1Ps := new(big.Int).Mul(Ps, dppk.b1)
+	b1Ps.Mod(b1Ps, dppk.PublicKey.Prime)
+	revb1Ps := new(big.Int).Sub(dppk.PublicKey.Prime, b1Ps)
+	b.Add(a1Qs, revb1Ps)
 	b.Mod(b, dppk.PublicKey.Prime)
-	c.Add(bigInt.Mul(dppk.b0, k), invA0)
+
+	c := new(big.Int)
+	a0Qs := new(big.Int).Mul(Qs, dppk.a0)
+	b0Ps := new(big.Int).Mul(Ps, dppk.b0)
+	b0Ps.Mod(b0Ps, dppk.PublicKey.Prime)
+	revb0Ps := new(big.Int).Sub(dppk.PublicKey.Prime, b0Ps)
+	c.Add(a0Qs, revb0Ps)
 	c.Mod(c, dppk.PublicKey.Prime)
 
-	fmt.Println("abc:", a, b, c)
-
-	// -b + sqrt(b^2 - 4ac)
-	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
+	fmt.Println("a,b,c", a, b, c)
+	fmt.Println("a0b0", dppk.a0, dppk.a1, dppk.b0, dppk.b1)
 
 	bsquared := new(big.Int).Mul(b, b)
 	bsquared.Mod(bsquared, dppk.PublicKey.Prime)
 
 	fourac := new(big.Int).Mul(big.NewInt(4), big.NewInt(0).Mul(a, c))
-	fourac = fourac.Mod(fourac, dppk.PublicKey.Prime)
+	fourac.Mod(fourac, dppk.PublicKey.Prime)
+	invFourac := new(big.Int).Sub(dppk.PublicKey.Prime, fourac)
 
-	squared := big.NewInt(0).Add(bsquared, bigInt.Sub(dppk.PublicKey.Prime, fourac))
-	squared = squared.Mod(squared, dppk.PublicKey.Prime)
+	squared := big.NewInt(0).Add(bsquared, invFourac)
+	squared.Mod(squared, dppk.PublicKey.Prime)
 
 	// solve quadratic equation
 	root1, root2, _ := sqrt(*squared, *dppk.PublicKey.Prime)
@@ -215,13 +227,20 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 
 	modInverse2a := big.NewInt(2)
 	modInverse2a.Mul(modInverse2a, a)
+	fmt.Println("modInverse2a:", modInverse2a)
+	modInverse2a.Mod(modInverse2a, dppk.PublicKey.Prime)
 	modInverse2a.ModInverse(modInverse2a, dppk.PublicKey.Prime)
+	fmt.Println("modInverse2a:", modInverse2a)
+
+	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
 
 	x := big.NewInt(0).Add(negb, &root1)
-	x = x.Mod(x.Mul(x, modInverse2a), dppk.PublicKey.Prime)
+	x.Mul(x, modInverse2a)
+	x.Mod(x, dppk.PublicKey.Prime)
 
 	y := big.NewInt(0).Add(negb, &root2)
-	y = y.Mod(y.Mul(y, modInverse2a), dppk.PublicKey.Prime)
+	y.Mul(y, modInverse2a)
+	y.Mod(y, dppk.PublicKey.Prime)
 
 	fmt.Println("X:", x.Int64())
 	fmt.Println("Y:", y.Int64())

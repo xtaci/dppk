@@ -11,10 +11,12 @@ func TestDPPK(t *testing.T) {
 	assert.Nil(t, err)
 	t.Log(dppk)
 
-	Ps, Qs, err := dppk.Encrypt(&dppk.PublicKey, []byte("W"))
+	secret := []byte("W")
+	Ps, Qs, err := dppk.Encrypt(&dppk.PublicKey, secret)
 	assert.Nil(t, err)
 	t.Log("Ps:", Ps)
 	t.Log("Qs:", Qs)
+	t.Log("secret:", secret)
 
 	dec, err := dppk.Decrypt(Ps, Qs)
 	t.Log(string(dec))
