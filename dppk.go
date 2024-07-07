@@ -225,25 +225,27 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (msg []byte, err error
 	fmt.Println("root1:", &root1)
 	fmt.Println("root2:", &root2)
 
-	modInverse2a := big.NewInt(2)
-	modInverse2a.Mul(modInverse2a, a)
-	fmt.Println("modInverse2a:", modInverse2a)
-	modInverse2a.Mod(modInverse2a, dppk.PublicKey.Prime)
-	modInverse2a.ModInverse(modInverse2a, dppk.PublicKey.Prime)
-	fmt.Println("modInverse2a:", modInverse2a)
+	// div 2a
+	inv2a := big.NewInt(2)
+	inv2a.Mul(inv2a, a)
+	inv2a.Mod(inv2a, dppk.PublicKey.Prime)
+	inv2a.ModInverse(inv2a, dppk.PublicKey.Prime)
 
 	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
 
-	x := big.NewInt(0).Add(negb, &root1)
-	x.Mul(x, modInverse2a)
-	x.Mod(x, dppk.PublicKey.Prime)
+	revRoot := new(big.Int).Sub(dppk.PublicKey.Prime, &root1)
+	x1 := big.NewInt(0).Add(negb, revRoot)
+	x1.Mod(x1, dppk.PublicKey.Prime)
+	x1.Mul(x1, inv2a)
+	x1.Mod(x1, dppk.PublicKey.Prime)
 
-	y := big.NewInt(0).Add(negb, &root2)
-	y.Mul(y, modInverse2a)
-	y.Mod(y, dppk.PublicKey.Prime)
+	x2 := big.NewInt(0).Add(negb, &root2)
+	x2.Mod(x2, dppk.PublicKey.Prime)
+	x2.Mul(x2, inv2a)
+	x2.Mod(x2, dppk.PublicKey.Prime)
 
-	fmt.Println("X:", x.Int64())
-	fmt.Println("Y:", y.Int64())
+	fmt.Println("x1:", x1.Int64())
+	fmt.Println("x2:", x2.Int64())
 	return nil, nil
 }
 
