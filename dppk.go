@@ -13,7 +13,6 @@ const PRIME = "32317006071311007300714876688669951960444102669715484032130345427
 type PrivateKey struct {
 	s0             *big.Int // Initial secret value
 	a0, a1, b0, b1 *big.Int // Coefficients for the polynomials
-	s0a0, s0b0     *big.Int // Precomputed constant terms of the polynomials
 	PublicKey
 }
 
@@ -27,6 +26,11 @@ type PublicKey struct {
 func (pk *PublicKey) GetPrime() *big.Int     { return pk.prime }
 func (pk *PublicKey) GetVectorU() []*big.Int { return pk.vecU }
 func (pk *PublicKey) GetVectorV() []*big.Int { return pk.vecV }
+
+func UnmarshalPublicKey(vecU, vecV []*big.Int) *PublicKey {
+	prime, _ := big.NewInt(0).SetString(PRIME, 10)
+	return &PublicKey{prime: prime, vecU: vecU, vecV: vecV}
+}
 
 // GenerateKey generates a new DPPK private key with the given order.
 func GenerateKey(order int) (*PrivateKey, error) {
@@ -110,13 +114,11 @@ RETRY:
 
 	// Create the private key
 	priv := &PrivateKey{
-		s0:   Bn[0],
-		a0:   a0,
-		a1:   a1,
-		b0:   b0,
-		b1:   b1,
-		s0a0: vecU[0],
-		s0b0: vecV[0],
+		s0: Bn[0],
+		a0: a0,
+		a1: a1,
+		b0: b0,
+		b1: b1,
 	}
 
 	// Set the public key vectors, excluding the first and last elements
@@ -173,9 +175,17 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	// Adjust Ps and Qs with precomputed constant terms
 	_Ps := new(big.Int).Set(Ps)
 	_Qs := new(big.Int).Set(Qs)
-	_Ps.Add(_Ps, dppk.s0a0)
+
+	s0a0 := new(big.Int)
+	s0b0 := new(big.Int)
+	s0a0.Mul(dppk.s0, dppk.a0)
+	s0a0.Mod(s0a0, dppk.PublicKey.prime)
+	s0b0.Mul(dppk.s0, dppk.b0)
+	s0b0.Mod(s0b0, dppk.PublicKey.prime)
+
+	_Ps.Add(_Ps, s0a0)
 	_Ps.Mod(_Ps, dppk.PublicKey.prime)
-	_Qs.Add(_Qs, dppk.s0b0)
+	_Qs.Add(_Qs, s0b0)
 	_Qs.Mod(_Qs, dppk.PublicKey.prime)
 
 	// As:
@@ -252,3 +262,8 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 
 	return x1, x2, nil
 }
+
+/*
+func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int) *PrivateKey {
+	priv = &PrivateKey{s0: s0, a0: a0, a1: a1, b0: b0, b1: b1, s0a0: s0a0, s0b0: s0b0, PublicKey: PublicKey{prime: prime, vecU: vecU, vecV: vecV}}
+}*/
