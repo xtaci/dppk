@@ -1,4 +1,15 @@
 # DPPK
+
+![image](https://github.com/xtaci/dppk/assets/2346725/33680bad-7a91-48a8-ad56-fbd3ac96aeaf)
+
+
+[![GoDoc][1]][2] [![Go Report Card][3]][4]
+
+[1]: https://godoc.org/github.com/xtaci/dppk?status.svg
+[2]: https://pkg.go.dev/github.com/xtaci/dppk
+[3]: https://goreportcard.com/badge/github.com/xtaci/dppk
+[4]: https://goreportcard.com/report/github.com/xtaci/dppk
+
 [A Deterministic Polynomial Public Key Algorithm over a Prime Galois Field GF(p)](https://www.researchgate.net/profile/Randy-Kuang/publication/358101087_A_Deterministic_Polynomial_Public_Key_Algorithm_over_a_Prime_Galois_Field_GFp/links/61f95ff44393577abe055af7/A-Deterministic-Polynomial-Public-Key-Algorithm-over-a-Prime-Galois-Field-GFp.pdf)
 
 DPPK is an [Key encapsulation mechanism](https://en.wikipedia.org/wiki/Key_encapsulation_mechanism), a.k.a. - KEM
