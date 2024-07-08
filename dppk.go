@@ -24,6 +24,10 @@ type PublicKey struct {
 	vecQ  []*big.Int // Coefficients for polynomial Q
 }
 
+func (pk *PublicKey) GetPrime() *big.Int     { return pk.prime }
+func (pk *PublicKey) GetVectorU() []*big.Int { return pk.vecU }
+func (pk *PublicKey) GetVectorQ() []*big.Int { return pk.vecQ }
+
 // GenerateKey generates a new DPPK private key with the given order.
 func GenerateKey(order int) (*PrivateKey, error) {
 	// Ensure the order is at least 5
