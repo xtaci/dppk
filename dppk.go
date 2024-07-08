@@ -15,14 +15,14 @@ const PRIME = "32317006071311007300714876688669951960444102669715484032130345427
 type PrivateKey struct {
 	s0             *big.Int
 	a0, a1, b0, b1 *big.Int
-	s0a0, s0b0     *big.Int
+	s0a0, s0b0     *big.Int // the constant term of the polynomial
 	PublicKey
 }
 
 type PublicKey struct {
-	Prime   *big.Int
-	VectorP []*big.Int
-	VectorQ []*big.Int
+	prime *big.Int
+	vecU  []*big.Int
+	vecQ  []*big.Int
 }
 
 // NewDPPK creates a new DPPK instance with the given order.
@@ -71,12 +71,12 @@ RETRY:
 	// the coefficient of x^n is 1
 	Bn = append(Bn, big.NewInt(1))
 
-	// vecP and vecQ
-	vecP := make([]*big.Int, order+3)
-	vecQ := make([]*big.Int, order+3)
+	// compute coefficients of vector U and V
+	vecU := make([]*big.Int, order+3)
+	vecV := make([]*big.Int, order+3)
 	for i := 0; i < order+3; i++ {
-		vecP[i] = big.NewInt(0)
-		vecQ[i] = big.NewInt(0)
+		vecU[i] = big.NewInt(0)
+		vecV[i] = big.NewInt(0)
 	}
 
 	bigInt := new(big.Int)
@@ -84,24 +84,24 @@ RETRY:
 	//  x^2 + a1x + a0
 	for i := 0; i < order+1; i++ {
 		// vector P
-		vecP[i].Add(vecP[i], bigInt.Mul(a0, Bn[i]))
-		vecP[i].Mod(vecP[i], prime)
+		vecU[i].Add(vecU[i], bigInt.Mul(a0, Bn[i]))
+		vecU[i].Mod(vecU[i], prime)
 
-		vecP[i+1].Add(vecP[i+1], bigInt.Mul(a1, Bn[i]))
-		vecP[i+1].Mod(vecP[i+1], prime)
+		vecU[i+1].Add(vecU[i+1], bigInt.Mul(a1, Bn[i]))
+		vecU[i+1].Mod(vecU[i+1], prime)
 
-		vecP[i+2].Add(vecP[i+2], Bn[i])
-		vecP[i+2].Mod(vecP[i+2], prime)
+		vecU[i+2].Add(vecU[i+2], Bn[i])
+		vecU[i+2].Mod(vecU[i+2], prime)
 
 		// vector Q
-		vecQ[i].Add(vecQ[i], bigInt.Mul(b0, Bn[i]))
-		vecQ[i].Mod(vecQ[i], prime)
+		vecV[i].Add(vecV[i], bigInt.Mul(b0, Bn[i]))
+		vecV[i].Mod(vecV[i], prime)
 
-		vecQ[i+1].Add(vecQ[i+1], bigInt.Mul(b1, Bn[i]))
-		vecQ[i+1].Mod(vecQ[i+1], prime)
+		vecV[i+1].Add(vecV[i+1], bigInt.Mul(b1, Bn[i]))
+		vecV[i+1].Mod(vecV[i+1], prime)
 
-		vecQ[i+2].Add(vecQ[i+2], Bn[i])
-		vecQ[i+2].Mod(vecQ[i+2], prime)
+		vecV[i+2].Add(vecV[i+2], Bn[i])
+		vecV[i+2].Mod(vecV[i+2], prime)
 	}
 
 	//fmt.Println(vecP[0], bigInt.Mod(bigInt.Mul(a0, coeff_base[0]), prime))
@@ -111,28 +111,28 @@ RETRY:
 		a1:   a1,
 		b0:   b0,
 		b1:   b1,
-		s0a0: vecP[0],
-		s0b0: vecQ[0],
+		s0a0: vecU[0],
+		s0b0: vecV[0],
 	}
 
 	// remove v0 and v(N+2)
-	priv.PublicKey.VectorP = vecP[1 : order+2]
-	priv.PublicKey.VectorQ = vecQ[1 : order+2]
-	priv.PublicKey.Prime = prime
+	priv.PublicKey.vecU = vecU[1 : order+2]
+	priv.PublicKey.vecQ = vecV[1 : order+2]
+	priv.PublicKey.prime = prime
 	return priv, nil
 }
 
 func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	secret := new(big.Int).SetBytes(msg)
-	if secret.Cmp(dppk.PublicKey.Prime) >= 0 {
+	if secret.Cmp(dppk.PublicKey.prime) >= 0 {
 		return nil, nil, errors.New("data is too large")
 	}
-	vecP := make([]*big.Int, len(dppk.PublicKey.VectorP)+1)
-	vecQ := make([]*big.Int, len(dppk.PublicKey.VectorQ)+1)
-	copy(vecP, pk.VectorP)
-	copy(vecQ, pk.VectorQ)
-	vecP[len(vecP)-1] = big.NewInt(1)
-	vecQ[len(vecQ)-1] = big.NewInt(1)
+	vecUExt := make([]*big.Int, len(dppk.PublicKey.vecU)+1)
+	vecQExt := make([]*big.Int, len(dppk.PublicKey.vecQ)+1)
+	copy(vecUExt, pk.vecU)
+	copy(vecQExt, pk.vecQ)
+	vecUExt[len(vecUExt)-1] = big.NewInt(1)
+	vecQExt[len(vecQExt)-1] = big.NewInt(1)
 
 	Ps = big.NewInt(0)
 	Qs = big.NewInt(0)
@@ -140,31 +140,31 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 	UiSi := new(big.Int)
 	ViSi := new(big.Int)
 
-	for i := range vecP {
-		UiSi.Mul(Si, vecP[i])
-		UiSi.Mod(UiSi, pk.Prime)
+	for i := range vecUExt {
+		UiSi.Mul(Si, vecUExt[i])
+		UiSi.Mod(UiSi, pk.prime)
 		Ps.Add(Ps, UiSi)
-		Ps.Mod(Ps, pk.Prime)
+		Ps.Mod(Ps, pk.prime)
 
-		ViSi.Mul(Si, vecQ[i])
-		ViSi.Mod(ViSi, pk.Prime)
+		ViSi.Mul(Si, vecQExt[i])
+		ViSi.Mod(ViSi, pk.prime)
 		Qs.Add(Qs, ViSi)
-		Qs.Mod(Qs, pk.Prime)
+		Qs.Mod(Qs, pk.prime)
 
 		Si.Mul(Si, secret)
-		Si.Mod(Si, pk.Prime)
+		Si.Mod(Si, pk.prime)
 	}
 
 	return Ps, Qs, nil
 }
 
-func (dppk *PrivateKey) Decrypt(inPs *big.Int, inQs *big.Int) (x1, x2 *big.Int, err error) {
-	Ps := new(big.Int).Set(inPs)
-	Qs := new(big.Int).Set(inQs)
-	Ps.Add(Ps, dppk.s0a0)
-	Ps.Mod(Ps, dppk.PublicKey.Prime)
-	Qs.Add(Qs, dppk.s0b0)
-	Qs.Mod(Qs, dppk.PublicKey.Prime)
+func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
+	_Ps := new(big.Int).Set(Ps)
+	_Qs := new(big.Int).Set(Qs)
+	_Ps.Add(_Ps, dppk.s0a0)
+	_Ps.Mod(_Ps, dppk.PublicKey.prime)
+	_Qs.Add(_Qs, dppk.s0b0)
+	_Qs.Mod(_Qs, dppk.PublicKey.prime)
 
 	// As:
 	// 	Ps := Bn * (x^2 + a1x + a0) mod p
@@ -184,57 +184,57 @@ func (dppk *PrivateKey) Decrypt(inPs *big.Int, inQs *big.Int) (x1, x2 *big.Int, 
 	// the following procedure will be formalized to :
 	// ax^2 + bx + c = 0
 	a := new(big.Int)
-	revPs := new(big.Int).Sub(dppk.PublicKey.Prime, Ps)
-	a.Add(Qs, revPs)
-	a.Mod(a, dppk.PublicKey.Prime)
+	revPs := new(big.Int).Sub(dppk.PublicKey.prime, _Ps)
+	a.Add(_Qs, revPs)
+	a.Mod(a, dppk.PublicKey.prime)
 
 	b := new(big.Int)
-	a1Qs := new(big.Int).Mul(Qs, dppk.a1)
-	b1Ps := new(big.Int).Mul(Ps, dppk.b1)
-	b1Ps.Mod(b1Ps, dppk.PublicKey.Prime)
-	revb1Ps := new(big.Int).Sub(dppk.PublicKey.Prime, b1Ps)
+	a1Qs := new(big.Int).Mul(_Qs, dppk.a1)
+	b1Ps := new(big.Int).Mul(_Ps, dppk.b1)
+	b1Ps.Mod(b1Ps, dppk.PublicKey.prime)
+	revb1Ps := new(big.Int).Sub(dppk.PublicKey.prime, b1Ps)
 	b.Add(a1Qs, revb1Ps)
-	b.Mod(b, dppk.PublicKey.Prime)
+	b.Mod(b, dppk.PublicKey.prime)
 
 	c := new(big.Int)
-	a0Qs := new(big.Int).Mul(Qs, dppk.a0)
-	b0Ps := new(big.Int).Mul(Ps, dppk.b0)
-	b0Ps.Mod(b0Ps, dppk.PublicKey.Prime)
-	revb0Ps := new(big.Int).Sub(dppk.PublicKey.Prime, b0Ps)
+	a0Qs := new(big.Int).Mul(_Qs, dppk.a0)
+	b0Ps := new(big.Int).Mul(_Ps, dppk.b0)
+	b0Ps.Mod(b0Ps, dppk.PublicKey.prime)
+	revb0Ps := new(big.Int).Sub(dppk.PublicKey.prime, b0Ps)
 	c.Add(a0Qs, revb0Ps)
-	c.Mod(c, dppk.PublicKey.Prime)
+	c.Mod(c, dppk.PublicKey.prime)
 
 	bsquared := new(big.Int).Mul(b, b)
-	bsquared.Mod(bsquared, dppk.PublicKey.Prime)
+	bsquared.Mod(bsquared, dppk.PublicKey.prime)
 
 	fourac := new(big.Int).Mul(big.NewInt(4), big.NewInt(0).Mul(a, c))
-	fourac.Mod(fourac, dppk.PublicKey.Prime)
-	invFourac := new(big.Int).Sub(dppk.PublicKey.Prime, fourac)
+	fourac.Mod(fourac, dppk.PublicKey.prime)
+	invFourac := new(big.Int).Sub(dppk.PublicKey.prime, fourac)
 
 	squared := big.NewInt(0).Add(bsquared, invFourac)
-	squared.Mod(squared, dppk.PublicKey.Prime)
+	squared.Mod(squared, dppk.PublicKey.prime)
 
 	// solve quadratic equation
-	root := new(big.Int).ModSqrt(squared, dppk.PublicKey.Prime)
+	root := new(big.Int).ModSqrt(squared, dppk.PublicKey.prime)
 
 	// div 2a
 	inv2a := big.NewInt(2)
 	inv2a.Mul(inv2a, a)
-	inv2a.Mod(inv2a, dppk.PublicKey.Prime)
-	inv2a.ModInverse(inv2a, dppk.PublicKey.Prime)
+	inv2a.Mod(inv2a, dppk.PublicKey.prime)
+	inv2a.ModInverse(inv2a, dppk.PublicKey.prime)
 
-	negb := new(big.Int).Sub(dppk.PublicKey.Prime, b)
+	negb := new(big.Int).Sub(dppk.PublicKey.prime, b)
 
-	revRoot := new(big.Int).Sub(dppk.PublicKey.Prime, root)
+	revRoot := new(big.Int).Sub(dppk.PublicKey.prime, root)
 	x1 = big.NewInt(0).Add(negb, revRoot)
-	x1.Mod(x1, dppk.PublicKey.Prime)
+	x1.Mod(x1, dppk.PublicKey.prime)
 	x1.Mul(x1, inv2a)
-	x1.Mod(x1, dppk.PublicKey.Prime)
+	x1.Mod(x1, dppk.PublicKey.prime)
 
 	x2 = big.NewInt(0).Add(negb, root)
-	x2.Mod(x2, dppk.PublicKey.Prime)
+	x2.Mod(x2, dppk.PublicKey.prime)
 	x2.Mul(x2, inv2a)
-	x2.Mod(x2, dppk.PublicKey.Prime)
+	x2.Mod(x2, dppk.PublicKey.prime)
 
 	return x1, x2, nil
 }
