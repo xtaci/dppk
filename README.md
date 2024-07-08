@@ -5,7 +5,7 @@ DPPK is an [Key encapsulation mechanism](https://en.wikipedia.org/wiki/Key_encap
 
 # Overview
 
-The ancient Vieta’s formulas reveal the relationships between the coefficients of an nth-degree polynomial and its roots. It has been surprisingly found that there exists a hidden secret for a potential public key exchange: decoupling the product of all roots (or the constant term) from the summations of root products (or coefficients) of a polynomial to establish a keypair.
+The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas) reveal the relationships between the coefficients of an nth-degree polynomial and its roots. It has been surprisingly found that there exists a hidden secret for a potential public key exchange: decoupling the product of all roots (or the constant term) from the summations of root products (or coefficients) of a polynomial to establish a keypair.
 
 # Proposed Algorithm: Deterministic Polynomial Public Key (DPPK)
 
