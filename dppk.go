@@ -21,12 +21,12 @@ type PrivateKey struct {
 type PublicKey struct {
 	prime *big.Int   // Prime number used in the protocol
 	vecU  []*big.Int // Coefficients for polynomial U
-	vecQ  []*big.Int // Coefficients for polynomial Q
+	vecV  []*big.Int // Coefficients for polynomial Q
 }
 
 func (pk *PublicKey) GetPrime() *big.Int     { return pk.prime }
 func (pk *PublicKey) GetVectorU() []*big.Int { return pk.vecU }
-func (pk *PublicKey) GetVectorQ() []*big.Int { return pk.vecQ }
+func (pk *PublicKey) GetVectorV() []*big.Int { return pk.vecV }
 
 // GenerateKey generates a new DPPK private key with the given order.
 func GenerateKey(order int) (*PrivateKey, error) {
@@ -121,7 +121,7 @@ RETRY:
 
 	// Set the public key vectors, excluding the first and last elements
 	priv.PublicKey.vecU = vecU[1 : order+2]
-	priv.PublicKey.vecQ = vecV[1 : order+2]
+	priv.PublicKey.vecV = vecV[1 : order+2]
 	priv.PublicKey.prime = prime
 	return priv, nil
 }
@@ -136,11 +136,11 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 
 	// Extend the vectors U and Q with a constant term of 1
 	vecUExt := make([]*big.Int, len(dppk.PublicKey.vecU)+1)
-	vecQExt := make([]*big.Int, len(dppk.PublicKey.vecQ)+1)
+	vecVExt := make([]*big.Int, len(dppk.PublicKey.vecV)+1)
 	copy(vecUExt, pk.vecU)
-	copy(vecQExt, pk.vecQ)
+	copy(vecVExt, pk.vecV)
 	vecUExt[len(vecUExt)-1] = big.NewInt(1)
-	vecQExt[len(vecQExt)-1] = big.NewInt(1)
+	vecVExt[len(vecVExt)-1] = big.NewInt(1)
 
 	// Initialize variables for the encryption process
 	Ps = big.NewInt(0)
@@ -156,7 +156,7 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 		Ps.Add(Ps, UiSi)
 		Ps.Mod(Ps, pk.prime)
 
-		ViSi.Mul(Si, vecQExt[i])
+		ViSi.Mul(Si, vecVExt[i])
 		ViSi.Mod(ViSi, pk.prime)
 		Qs.Add(Qs, ViSi)
 		Qs.Mod(Qs, pk.prime)
