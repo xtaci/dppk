@@ -8,15 +8,16 @@ import (
 )
 
 func TestDPPK(t *testing.T) {
-	dppk, err := GenerateKey(5)
+	alice, err := GenerateKey(10)
+	bob, err := GenerateKey(10)
 	assert.Nil(t, err)
 
 	secret := []byte("hello quantum")
-	Ps, Qs, err := dppk.Encrypt(&dppk.PublicKey, secret)
+	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
-	x1, x2, err := dppk.Decrypt(Ps, Qs)
+	x1, x2, err := alice.Decrypt(Ps, Qs)
 	t.Log("x1:", string(x1.Bytes()))
 	t.Log("x2:", string(x2.Bytes()))
 
@@ -24,7 +25,15 @@ func TestDPPK(t *testing.T) {
 	assert.True(t, equal)
 }
 
-func BenchmarkDPPK(b *testing.B) {
+func BenchmarkDPPKEncrypt(b *testing.B) {
+	dppk, _ := GenerateKey(5)
+	secret := []byte("hello quantum")
+	for i := 0; i < b.N; i++ {
+		dppk.Encrypt(&dppk.PublicKey, secret)
+	}
+}
+
+func BenchmarkDPPKDecrypt(b *testing.B) {
 	dppk, _ := GenerateKey(5)
 	secret := []byte("hello quantum")
 	Ps, Qs, _ := dppk.Encrypt(&dppk.PublicKey, secret)

@@ -4,19 +4,20 @@
 # Examples
 ```golang
 func TestDPPK(t *testing.T) {
-    dppk, err := GenerateKey(5)
-    assert.Nil(t, err)
+	alice, err := GenerateKey(10)
+	bob, err := GenerateKey(10)
+	assert.Nil(t, err)
 
-    secret := []byte("hello quantum")
-    Ps, Qs, err := dppk.Encrypt(&dppk.PublicKey, secret)
-    assert.Nil(t, err)
-    t.Log("secret:", string(secret))
+	secret := []byte("hello quantum")
+	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
+	assert.Nil(t, err)
+	t.Log("secret:", string(secret))
 
-    x1, x2, err := dppk.Decrypt(Ps, Qs)
-    t.Log("x1:", string(x1.Bytes()))
-    t.Log("x2:", string(x2.Bytes()))
+	x1, x2, err := alice.Decrypt(Ps, Qs)
+	t.Log("x1:", string(x1.Bytes()))
+	t.Log("x2:", string(x2.Bytes()))
 
-    equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
-    assert.True(t, equal)
+	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
+	assert.True(t, equal)
 }
 ```
