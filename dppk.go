@@ -12,7 +12,6 @@ const PRIME = "32317006071311007300714876688669951960444102669715484032130345427
 
 // PrivateKey represents a private key in the DPPK protocol.
 type PrivateKey struct {
-	order          int      // Order of the base polynomials
 	s0             *big.Int // Initial secret value
 	a0, a1, b0, b1 *big.Int // Coefficients for the polynomials
 	PublicKey
@@ -25,6 +24,7 @@ type PublicKey struct {
 	vecV  []*big.Int // Coefficients for polynomial V
 }
 
+// MarshalJSON marshals the public key to JSON.
 func (pk *PublicKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Prime   *big.Int   `json:"prime"`
@@ -37,6 +37,7 @@ func (pk *PublicKey) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalPublicKeyJSON unmarshals a public key from JSON.
 func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
 	pkjson := &struct {
 		Prime   *big.Int   `json:"prime"`
@@ -56,6 +57,7 @@ func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
 	}, nil
 }
 
+// UnmarshalPublicKey unmarshals a public key from vector U and V.
 func UnmarshalPublicKey(vecU, vecV []*big.Int) *PublicKey {
 	prime, _ := big.NewInt(0).SetString(PRIME, 10)
 	return &PublicKey{prime: prime, vecU: vecU, vecV: vecV}
@@ -295,6 +297,7 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	return x1, x2, nil
 }
 
+// UnmarshalPrivateKey unmarshals a private key from parameters
 func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int) *PrivateKey {
 	prime, _ := big.NewInt(0).SetString(PRIME, 10)
 	return &PrivateKey{
