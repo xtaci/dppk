@@ -1,7 +1,7 @@
 # DPPK
 [A Deterministic Polynomial Public Key Algorithm over a Prime Galois Field GF(p)](https://www.researchgate.net/profile/Randy-Kuang/publication/358101087_A_Deterministic_Polynomial_Public_Key_Algorithm_over_a_Prime_Galois_Field_GFp/links/61f95ff44393577abe055af7/A-Deterministic-Polynomial-Public-Key-Algorithm-over-a-Prime-Galois-Field-GFp.pdf)
 
-DPPK is an [KEM](https://en.wikipedia.org/wiki/Key_encapsulation_mechanism)
+DPPK is an [Key encapsulation mechanism](https://en.wikipedia.org/wiki/Key_encapsulation_mechanism), a.k.a. - KEM
 
 # Overview
 
