@@ -25,6 +25,20 @@ func TestDPPK(t *testing.T) {
 	assert.True(t, equal)
 }
 
+func TestMarshal(t *testing.T) {
+	dppk, _ := GenerateKey(5)
+	bts, err := dppk.PublicKey.MarshalJSON()
+	assert.Nil(t, err)
+	t.Log(string(bts))
+
+	pk, err := UnmarshalPublicKeyJSON(bts)
+	assert.Nil(t, err)
+	assert.Equal(t, dppk.PublicKey, *pk)
+
+	pk = UnmarshalPublicKey(dppk.PublicKey.vecU, dppk.PublicKey.vecV)
+	assert.Equal(t, dppk.PublicKey, *pk)
+}
+
 func BenchmarkDPPKEncrypt(b *testing.B) {
 	dppk, _ := GenerateKey(5)
 	secret := []byte("hello quantum")

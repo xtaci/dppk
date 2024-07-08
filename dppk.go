@@ -2,6 +2,7 @@ package dppk
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"math/big"
 )
@@ -11,6 +12,7 @@ const PRIME = "32317006071311007300714876688669951960444102669715484032130345427
 
 // PrivateKey represents a private key in the DPPK protocol.
 type PrivateKey struct {
+	order          int      // Order of the base polynomials
 	s0             *big.Int // Initial secret value
 	a0, a1, b0, b1 *big.Int // Coefficients for the polynomials
 	PublicKey
@@ -23,9 +25,36 @@ type PublicKey struct {
 	vecV  []*big.Int // Coefficients for polynomial V
 }
 
-func (pk *PublicKey) GetPrime() *big.Int     { return pk.prime }
-func (pk *PublicKey) GetVectorU() []*big.Int { return pk.vecU }
-func (pk *PublicKey) GetVectorV() []*big.Int { return pk.vecV }
+func (pk *PublicKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Prime   *big.Int   `json:"prime"`
+		VectorU []*big.Int `json:"vectorU"`
+		VectorV []*big.Int `json:"vectorV"`
+	}{
+		Prime:   pk.prime,
+		VectorU: pk.vecU,
+		VectorV: pk.vecV,
+	})
+}
+
+func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
+	pkjson := &struct {
+		Prime   *big.Int   `json:"prime"`
+		VectorU []*big.Int `json:"vectorU"`
+		VectorV []*big.Int `json:"vectorV"`
+	}{}
+
+	err := json.Unmarshal(jsontext, pkjson)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublicKey{
+		prime: pkjson.Prime,
+		vecU:  pkjson.VectorU,
+		vecV:  pkjson.VectorV,
+	}, nil
+}
 
 func UnmarshalPublicKey(vecU, vecV []*big.Int) *PublicKey {
 	prime, _ := big.NewInt(0).SetString(PRIME, 10)
@@ -266,7 +295,18 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	return x1, x2, nil
 }
 
-/*
-func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int) *PrivateKey {
-	priv = &PrivateKey{s0: s0, a0: a0, a1: a1, b0: b0, b1: b1, s0a0: s0a0, s0b0: s0b0, PublicKey: PublicKey{prime: prime, vecU: vecU, vecV: vecV}}
-}*/
+func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int) *PrivateKey {
+	prime, _ := big.NewInt(0).SetString(PRIME, 10)
+	return &PrivateKey{
+		s0: s0,
+		a0: a0,
+		a1: a1,
+		b0: b0,
+		b1: b1,
+		PublicKey: PublicKey{
+			prime: prime,
+			vecU:  vecU,
+			vecV:  vecV,
+		},
+	}
+}
