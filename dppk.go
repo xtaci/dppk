@@ -20,7 +20,7 @@ type PrivateKey struct {
 type PublicKey struct {
 	prime *big.Int   // Prime number used in the protocol
 	vecU  []*big.Int // Coefficients for polynomial U
-	vecV  []*big.Int // Coefficients for polynomial Q
+	vecV  []*big.Int // Coefficients for polynomial V
 }
 
 func (pk *PublicKey) GetPrime() *big.Int     { return pk.prime }
@@ -79,7 +79,7 @@ RETRY:
 	// Ensure the coefficient of x^n is 1
 	Bn = append(Bn, big.NewInt(1))
 
-	// Initialize vectors for polynomials U(x) and Q(x)
+	// Initialize vectors for polynomials U(x) and V(x)
 	vecU := make([]*big.Int, order+3)
 	vecV := make([]*big.Int, order+3)
 	for i := 0; i < order+3; i++ {
@@ -89,7 +89,7 @@ RETRY:
 
 	bigInt := new(big.Int)
 
-	// Compute the coefficients for the polynomials U(x) and Q(x) using Vieta's formulas
+	// Compute the coefficients for the polynomials U(x) and V(x) using Vieta's formulas
 	for i := 0; i < order+1; i++ {
 		// Vector U
 		vecU[i].Add(vecU[i], bigInt.Mul(a0, Bn[i]))
@@ -101,7 +101,7 @@ RETRY:
 		vecU[i+2].Add(vecU[i+2], Bn[i])
 		vecU[i+2].Mod(vecU[i+2], prime)
 
-		// Vector Q
+		// Vector V
 		vecV[i].Add(vecV[i], bigInt.Mul(b0, Bn[i]))
 		vecV[i].Mod(vecV[i], prime)
 
@@ -172,9 +172,9 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 
 // Decrypt decrypts the encrypted values Ps and Qs using the private key.
 func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
-	// Adjust Ps and Qs with precomputed constant terms
-	_Ps := new(big.Int).Set(Ps)
-	_Qs := new(big.Int).Set(Qs)
+	// Add constant term to get full Ps and Qs polynomial
+	fullPS := new(big.Int).Set(Ps)
+	fullQs := new(big.Int).Set(Qs)
 
 	s0a0 := new(big.Int)
 	s0b0 := new(big.Int)
@@ -183,44 +183,47 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	s0b0.Mul(dppk.s0, dppk.b0)
 	s0b0.Mod(s0b0, dppk.PublicKey.prime)
 
-	_Ps.Add(_Ps, s0a0)
-	_Ps.Mod(_Ps, dppk.PublicKey.prime)
-	_Qs.Add(_Qs, s0b0)
-	_Qs.Mod(_Qs, dppk.PublicKey.prime)
+	fullPS.Add(fullPS, s0a0)
+	fullPS.Mod(fullPS, dppk.PublicKey.prime)
+	fullQs.Add(fullQs, s0b0)
+	fullQs.Mod(fullQs, dppk.PublicKey.prime)
 
+	// Explanation:
 	// As:
 	//      Ps := Bn * (x^2 + a1x + a0) mod p
 	//      Qs := Bn * (x^2 + b1x + b0) mod p
 	//
-	// We have:
+	// multiply the reverse of Bn on the both side of the equation, we have:
 	//      Ps*revBn(s):= (x^2 + a1x + a0) mod p
 	//      Qs*revBn(s):= (x^2 + b1x + b0) mod p
 	//
-	// Then:
+	// to align the left and right side of the equation, we have:
 	//      Ps* Qs * revBn(s):= (x^2 + a1x + a0) * Qs mod p
 	//      Ps* Qs * revBn(s):= (x^2 + b1x + b0) * Ps mod p
 	//
-	// Solve this equation to get x
+	// and evidently:
 	//      (x^2 + a1x + a0) * Qs  == (x^2 + b1x + b0) * Ps modp
+	//
+	// Solve this equation to get x
 	// the following procedure will be formalized to :
 	// ax^2 + bx + c = 0
 
 	a := new(big.Int)
-	revPs := new(big.Int).Sub(dppk.PublicKey.prime, _Ps)
-	a.Add(_Qs, revPs)
+	revPs := new(big.Int).Sub(dppk.PublicKey.prime, fullPS)
+	a.Add(fullQs, revPs)
 	a.Mod(a, dppk.PublicKey.prime)
 
 	b := new(big.Int)
-	a1Qs := new(big.Int).Mul(_Qs, dppk.a1)
-	b1Ps := new(big.Int).Mul(_Ps, dppk.b1)
+	a1Qs := new(big.Int).Mul(fullQs, dppk.a1)
+	b1Ps := new(big.Int).Mul(fullPS, dppk.b1)
 	b1Ps.Mod(b1Ps, dppk.PublicKey.prime)
 	revb1Ps := new(big.Int).Sub(dppk.PublicKey.prime, b1Ps)
 	b.Add(a1Qs, revb1Ps)
 	b.Mod(b, dppk.PublicKey.prime)
 
 	c := new(big.Int)
-	a0Qs := new(big.Int).Mul(_Qs, dppk.a0)
-	b0Ps := new(big.Int).Mul(_Ps, dppk.b0)
+	a0Qs := new(big.Int).Mul(fullQs, dppk.a0)
+	b0Ps := new(big.Int).Mul(fullPS, dppk.b0)
 	b0Ps.Mod(b0Ps, dppk.PublicKey.prime)
 	revb0Ps := new(big.Int).Sub(dppk.PublicKey.prime, b0Ps)
 	c.Add(a0Qs, revb0Ps)
