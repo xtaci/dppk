@@ -27,7 +27,28 @@ func TestDPPK(t *testing.T) {
 	assert.True(t, equal)
 }
 
-func TestMarshal(t *testing.T) {
+func TestDPPKSmallPrime(t *testing.T) {
+	prime := "977"
+	alice, err := GenerateKeyWithPrime(10, prime)
+	assert.Nil(t, err)
+	bob, err := GenerateKeyWithPrime(10, prime)
+	assert.Nil(t, err)
+
+	secret := []byte("X")
+	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
+	assert.Nil(t, err)
+	t.Log("secret:", string(secret))
+
+	x1, x2, err := alice.Decrypt(Ps, Qs)
+	assert.Nil(t, err)
+	t.Log("x1:", string(x1.Bytes()))
+	t.Log("x2:", string(x2.Bytes()))
+
+	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
+	assert.True(t, equal)
+}
+
+func TestMarshalPublicKey(t *testing.T) {
 	dppk, _ := GenerateKey(5)
 	bts, err := dppk.PublicKey.MarshalJSON()
 	assert.Nil(t, err)
@@ -36,9 +57,18 @@ func TestMarshal(t *testing.T) {
 	pk, err := UnmarshalPublicKeyJSON(bts)
 	assert.Nil(t, err)
 	assert.Equal(t, dppk.PublicKey, *pk)
+}
 
-	pk = UnmarshalPublicKey(dppk.PublicKey.vecU, dppk.PublicKey.vecV)
-	assert.Equal(t, dppk.PublicKey, *pk)
+func TestMarshalPrivateKey(t *testing.T) {
+	dppk, _ := GenerateKey(5)
+	bts, err := dppk.MarshalJSON()
+	assert.Nil(t, err)
+	t.Log(string(bts))
+
+	priv, err := UnmarshalPrivateKeyJSON(bts)
+	assert.Nil(t, err)
+	assert.Equal(t, dppk, priv)
+
 }
 
 func BenchmarkDPPKEncrypt(b *testing.B) {

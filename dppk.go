@@ -32,13 +32,15 @@ type PublicKey struct {
 	vecV  []*big.Int // Coefficients for polynomial V
 }
 
+type jsonPublicKey struct {
+	Prime   *big.Int   `json:"prime"`
+	VectorU []*big.Int `json:"vectorU"`
+	VectorV []*big.Int `json:"vectorV"`
+}
+
 // MarshalJSON marshals the public key to JSON.
 func (pk *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Prime   *big.Int   `json:"prime"`
-		VectorU []*big.Int `json:"vectorU"`
-		VectorV []*big.Int `json:"vectorV"`
-	}{
+	return json.Marshal(jsonPublicKey{
 		Prime:   pk.prime,
 		VectorU: pk.vecU,
 		VectorV: pk.vecV,
@@ -47,11 +49,7 @@ func (pk *PublicKey) MarshalJSON() ([]byte, error) {
 
 // UnmarshalPublicKeyJSON unmarshals a public key from JSON.
 func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
-	pkjson := &struct {
-		Prime   *big.Int   `json:"prime"`
-		VectorU []*big.Int `json:"vectorU"`
-		VectorV []*big.Int `json:"vectorV"`
-	}{}
+	pkjson := &jsonPublicKey{}
 
 	err := json.Unmarshal(jsontext, pkjson)
 	if err != nil {
@@ -63,12 +61,6 @@ func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
 		vecU:  pkjson.VectorU,
 		vecV:  pkjson.VectorV,
 	}, nil
-}
-
-// UnmarshalPublicKey unmarshals a public key from vector U and V.
-func UnmarshalPublicKey(vecU, vecV []*big.Int) *PublicKey {
-	prime, _ := big.NewInt(0).SetString(PRIME, 10)
-	return &PublicKey{prime: prime, vecU: vecU, vecV: vecV}
 }
 
 // GenerateKey generates a new DPPK private key with the given order and prime number
@@ -179,16 +171,16 @@ RETRY:
 }
 
 // Encrypt encrypts a message using the given public key.
-func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+func (priv *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
-	if secret.Cmp(dppk.PublicKey.prime) >= 0 {
+	if secret.Cmp(priv.PublicKey.prime) >= 0 {
 		return nil, nil, errors.New(ERRMSG_DATA_EXCEEDED_FIELD)
 	}
 
 	// Extend the vectors U and Q with a constant term of 1
-	vecUExt := make([]*big.Int, len(dppk.PublicKey.vecU)+1)
-	vecVExt := make([]*big.Int, len(dppk.PublicKey.vecV)+1)
+	vecUExt := make([]*big.Int, len(priv.PublicKey.vecU)+1)
+	vecVExt := make([]*big.Int, len(priv.PublicKey.vecV)+1)
 	copy(vecUExt, pk.vecU)
 	copy(vecVExt, pk.vecV)
 	vecUExt[len(vecUExt)-1] = big.NewInt(1)
@@ -221,7 +213,7 @@ func (dppk *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big
 }
 
 // Decrypt decrypts the encrypted values Ps and Qs using the private key.
-func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
+func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
 	if Ps == nil || Qs == nil {
 		return nil, nil, errors.New(ERRMSG_NULL_ENCRYPT)
 	}
@@ -231,15 +223,15 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 
 	s0a0 := new(big.Int)
 	s0b0 := new(big.Int)
-	s0a0.Mul(dppk.s0, dppk.a0)
-	s0a0.Mod(s0a0, dppk.PublicKey.prime)
-	s0b0.Mul(dppk.s0, dppk.b0)
-	s0b0.Mod(s0b0, dppk.PublicKey.prime)
+	s0a0.Mul(priv.s0, priv.a0)
+	s0a0.Mod(s0a0, priv.PublicKey.prime)
+	s0b0.Mul(priv.s0, priv.b0)
+	s0b0.Mod(s0b0, priv.PublicKey.prime)
 
 	fullPS.Add(fullPS, s0a0)
-	fullPS.Mod(fullPS, dppk.PublicKey.prime)
+	fullPS.Mod(fullPS, priv.PublicKey.prime)
 	fullQs.Add(fullQs, s0b0)
-	fullQs.Mod(fullQs, dppk.PublicKey.prime)
+	fullQs.Mod(fullQs, priv.PublicKey.prime)
 
 	// Explanation:
 	// As:
@@ -262,76 +254,111 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	// ax^2 + bx + c = 0
 
 	a := new(big.Int)
-	revPs := new(big.Int).Sub(dppk.PublicKey.prime, fullPS)
+	revPs := new(big.Int).Sub(priv.PublicKey.prime, fullPS)
 	a.Add(fullQs, revPs)
-	a.Mod(a, dppk.PublicKey.prime)
+	a.Mod(a, priv.PublicKey.prime)
 
 	b := new(big.Int)
-	a1Qs := new(big.Int).Mul(fullQs, dppk.a1)
-	b1Ps := new(big.Int).Mul(fullPS, dppk.b1)
-	b1Ps.Mod(b1Ps, dppk.PublicKey.prime)
-	revb1Ps := new(big.Int).Sub(dppk.PublicKey.prime, b1Ps)
+	a1Qs := new(big.Int).Mul(fullQs, priv.a1)
+	b1Ps := new(big.Int).Mul(fullPS, priv.b1)
+	b1Ps.Mod(b1Ps, priv.PublicKey.prime)
+	revb1Ps := new(big.Int).Sub(priv.PublicKey.prime, b1Ps)
 	b.Add(a1Qs, revb1Ps)
-	b.Mod(b, dppk.PublicKey.prime)
+	b.Mod(b, priv.PublicKey.prime)
 
 	c := new(big.Int)
-	a0Qs := new(big.Int).Mul(fullQs, dppk.a0)
-	b0Ps := new(big.Int).Mul(fullPS, dppk.b0)
-	b0Ps.Mod(b0Ps, dppk.PublicKey.prime)
-	revb0Ps := new(big.Int).Sub(dppk.PublicKey.prime, b0Ps)
+	a0Qs := new(big.Int).Mul(fullQs, priv.a0)
+	b0Ps := new(big.Int).Mul(fullPS, priv.b0)
+	b0Ps.Mod(b0Ps, priv.PublicKey.prime)
+	revb0Ps := new(big.Int).Sub(priv.PublicKey.prime, b0Ps)
 	c.Add(a0Qs, revb0Ps)
-	c.Mod(c, dppk.PublicKey.prime)
+	c.Mod(c, priv.PublicKey.prime)
 
 	// Solve the quadratic equation derived from Ps and Qs
 	// Compute the discriminant of the quadratic equation
 	bsquared := new(big.Int).Mul(b, b)
-	bsquared.Mod(bsquared, dppk.PublicKey.prime)
+	bsquared.Mod(bsquared, priv.PublicKey.prime)
 
 	fourac := new(big.Int).Mul(big.NewInt(4), big.NewInt(0).Mul(a, c))
-	fourac.Mod(fourac, dppk.PublicKey.prime)
-	invFourac := new(big.Int).Sub(dppk.PublicKey.prime, fourac)
+	fourac.Mod(fourac, priv.PublicKey.prime)
+	invFourac := new(big.Int).Sub(priv.PublicKey.prime, fourac)
 
 	squared := big.NewInt(0).Add(bsquared, invFourac)
-	squared.Mod(squared, dppk.PublicKey.prime)
+	squared.Mod(squared, priv.PublicKey.prime)
 
 	// Solve the quadratic equation
-	root := new(big.Int).ModSqrt(squared, dppk.PublicKey.prime)
+	root := new(big.Int).ModSqrt(squared, priv.PublicKey.prime)
 
 	// Calculate the roots of the equation
 	inv2a := big.NewInt(2)
 	inv2a.Mul(inv2a, a)
-	inv2a.Mod(inv2a, dppk.PublicKey.prime)
-	inv2a.ModInverse(inv2a, dppk.PublicKey.prime)
+	inv2a.Mod(inv2a, priv.PublicKey.prime)
+	inv2a.ModInverse(inv2a, priv.PublicKey.prime)
 
-	negb := new(big.Int).Sub(dppk.PublicKey.prime, b)
+	negb := new(big.Int).Sub(priv.PublicKey.prime, b)
 
-	revRoot := new(big.Int).Sub(dppk.PublicKey.prime, root)
+	revRoot := new(big.Int).Sub(priv.PublicKey.prime, root)
 	x1 = big.NewInt(0).Add(negb, revRoot)
-	x1.Mod(x1, dppk.PublicKey.prime)
+	x1.Mod(x1, priv.PublicKey.prime)
 	x1.Mul(x1, inv2a)
-	x1.Mod(x1, dppk.PublicKey.prime)
+	x1.Mod(x1, priv.PublicKey.prime)
 
 	x2 = big.NewInt(0).Add(negb, root)
-	x2.Mod(x2, dppk.PublicKey.prime)
+	x2.Mod(x2, priv.PublicKey.prime)
 	x2.Mul(x2, inv2a)
-	x2.Mod(x2, dppk.PublicKey.prime)
+	x2.Mod(x2, priv.PublicKey.prime)
 
 	return x1, x2, nil
 }
 
+// MarshalJSON marshals the public key to JSON.
+func (priv *PrivateKey) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		S0             *big.Int
+		A0, A1, B0, B1 *big.Int
+		PublicKey      jsonPublicKey
+	}{
+		S0: priv.s0,
+		A0: priv.a0,
+		A1: priv.a1,
+		B0: priv.b0,
+		B1: priv.b1,
+		PublicKey: jsonPublicKey{
+			Prime:   priv.prime,
+			VectorU: priv.vecU,
+			VectorV: priv.vecV,
+		},
+	})
+}
+
+func UnmarshalPrivateKeyJSON(jsontext []byte) (*PrivateKey, error) {
+	privjson := struct {
+		S0             *big.Int
+		A0, A1, B0, B1 *big.Int
+		PublicKey      jsonPublicKey
+	}{}
+
+	err := json.Unmarshal(jsontext, &privjson)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PrivateKey{
+		s0: privjson.S0,
+		a0: privjson.A0,
+		a1: privjson.A1,
+		b0: privjson.B0,
+		b1: privjson.B1,
+		PublicKey: PublicKey{
+			prime: privjson.PublicKey.Prime,
+			vecU:  privjson.PublicKey.VectorU,
+			vecV:  privjson.PublicKey.VectorV,
+		},
+	}, nil
+}
+
 // UnmarshalPrivateKeyWithPrime unmarshals a private key with given prime number
-func UnmarshalPrivateKeyWithPrime(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
-	return unmarshalPrivateKey(s0, a0, a1, b0, b1, vecU, vecV, prime)
-}
-
-// UnmarshalPrivateKey unmarshals a private key with given default prime number
-func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int) *PrivateKey {
-	prime, _ := big.NewInt(0).SetString(PRIME, 10)
-	return unmarshalPrivateKey(s0, a0, a1, b0, b1, vecU, vecV, prime)
-}
-
-// unmarshalPrivateKey unmarshals a private key with given prime number
-func unmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
+func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
 	return &PrivateKey{
 		s0: s0,
 		a0: a0,
