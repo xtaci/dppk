@@ -71,13 +71,24 @@ func UnmarshalPublicKey(vecU, vecV []*big.Int) *PublicKey {
 	return &PublicKey{prime: prime, vecU: vecU, vecV: vecV}
 }
 
-// GenerateKey generates a new DPPK private key with the given order.
+// GenerateKey generates a new DPPK private key with the given order and prime number
+// the prime number is a string formatted in base 10
+func GenerateKeyWithPrime(order int, prime string) (*PrivateKey, error) {
+	return generateKey(order, prime)
+}
+
+// GenerateKey generates a new DPPK private key with the given order and default prime number
 func GenerateKey(order int) (*PrivateKey, error) {
+	return generateKey(order, PRIME)
+}
+
+// GenerateKey generates a new DPPK private key with the given order.
+func generateKey(order int, strPrime string) (*PrivateKey, error) {
 	// Ensure the order is at least 5
 	if order < 5 {
 		return nil, errors.New(ERRMSG_ORDER)
 	}
-	prime, _ := big.NewInt(0).SetString(PRIME, 10)
+	prime, _ := big.NewInt(0).SetString(strPrime, 10)
 
 RETRY:
 	// Generate random coefficients for the polynomials
@@ -308,9 +319,19 @@ func (dppk *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	return x1, x2, nil
 }
 
-// UnmarshalPrivateKey unmarshals a private key from parameters
+// UnmarshalPrivateKeyWithPrime unmarshals a private key with given prime number
+func UnmarshalPrivateKeyWithPrime(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
+	return unmarshalPrivateKey(s0, a0, a1, b0, b1, vecU, vecV, prime)
+}
+
+// UnmarshalPrivateKey unmarshals a private key with given default prime number
 func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int) *PrivateKey {
 	prime, _ := big.NewInt(0).SetString(PRIME, 10)
+	return unmarshalPrivateKey(s0, a0, a1, b0, b1, vecU, vecV, prime)
+}
+
+// unmarshalPrivateKey unmarshals a private key with given prime number
+func unmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
 	return &PrivateKey{
 		s0: s0,
 		a0: a0,
