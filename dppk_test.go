@@ -10,11 +10,9 @@ import (
 func TestDPPK(t *testing.T) {
 	alice, err := GenerateKey(10)
 	assert.Nil(t, err)
-	bob, err := GenerateKey(10)
-	assert.Nil(t, err)
 
 	secret := []byte("hello quantum")
-	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
+	Ps, Qs, err := Encrypt(&alice.PublicKey, secret)
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
@@ -31,11 +29,9 @@ func TestDPPKSmallPrime(t *testing.T) {
 	prime := "977"
 	alice, err := GenerateKeyWithPrime(10, prime)
 	assert.Nil(t, err)
-	bob, err := GenerateKeyWithPrime(10, prime)
-	assert.Nil(t, err)
 
 	secret := []byte("X")
-	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
+	Ps, Qs, err := Encrypt(&alice.PublicKey, secret)
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
@@ -75,14 +71,14 @@ func BenchmarkDPPKEncrypt(b *testing.B) {
 	dppk, _ := GenerateKey(5)
 	secret := []byte("hello quantum")
 	for i := 0; i < b.N; i++ {
-		_, _, _ = dppk.Encrypt(&dppk.PublicKey, secret)
+		_, _, _ = Encrypt(&dppk.PublicKey, secret)
 	}
 }
 
 func BenchmarkDPPKDecrypt(b *testing.B) {
 	dppk, _ := GenerateKey(5)
 	secret := []byte("hello quantum")
-	Ps, Qs, _ := dppk.Encrypt(&dppk.PublicKey, secret)
+	Ps, Qs, _ := Encrypt(&dppk.PublicKey, secret)
 	for i := 0; i < b.N; i++ {
 		_, _, _ = dppk.Decrypt(Ps, Qs)
 	}

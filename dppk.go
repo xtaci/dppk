@@ -171,16 +171,16 @@ RETRY:
 }
 
 // Encrypt encrypts a message using the given public key.
-func (priv *PrivateKey) Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+func Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
-	if secret.Cmp(priv.PublicKey.prime) >= 0 {
+	if secret.Cmp(pk.prime) >= 0 {
 		return nil, nil, errors.New(ERRMSG_DATA_EXCEEDED_FIELD)
 	}
 
 	// Extend the vectors U and Q with a constant term of 1
-	vecUExt := make([]*big.Int, len(priv.PublicKey.vecU)+1)
-	vecVExt := make([]*big.Int, len(priv.PublicKey.vecV)+1)
+	vecUExt := make([]*big.Int, len(pk.vecU)+1)
+	vecVExt := make([]*big.Int, len(pk.vecV)+1)
 	copy(vecUExt, pk.vecU)
 	copy(vecVExt, pk.vecV)
 	vecUExt[len(vecUExt)-1] = big.NewInt(1)
