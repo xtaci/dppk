@@ -61,15 +61,15 @@ The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formula
 ```golang
 func TestDPPK(t *testing.T) {
 	alice, err := GenerateKey(10)
-	bob, err := GenerateKey(10)
 	assert.Nil(t, err)
 
 	secret := []byte("hello quantum")
-	Ps, Qs, err := bob.Encrypt(&alice.PublicKey, secret)
+	Ps, Qs, err := Encrypt(&alice.PublicKey, secret)
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
 	x1, x2, err := alice.Decrypt(Ps, Qs)
+	assert.Nil(t, err)
 	t.Log("x1:", string(x1.Bytes()))
 	t.Log("x2:", string(x2.Bytes()))
 
