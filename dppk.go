@@ -234,8 +234,8 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 		return nil, nil, errors.New(ERR_MSG_NULL_ENCRYPT)
 	}
 	// Add constant term to get full Ps and Qs polynomial
-	fullPS := new(big.Int).Set(Ps)
-	fullQs := new(big.Int).Set(Qs)
+	polyP := new(big.Int).Set(Ps)
+	polyQ := new(big.Int).Set(Qs)
 
 	s0a0 := new(big.Int)
 	s0b0 := new(big.Int)
@@ -244,10 +244,10 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	s0b0.Mul(priv.s0, priv.b0)
 	s0b0.Mod(s0b0, priv.PublicKey.prime)
 
-	fullPS.Add(fullPS, s0a0)
-	fullPS.Mod(fullPS, priv.PublicKey.prime)
-	fullQs.Add(fullQs, s0b0)
-	fullQs.Mod(fullQs, priv.PublicKey.prime)
+	polyP.Add(polyP, s0a0)
+	polyP.Mod(polyP, priv.PublicKey.prime)
+	polyQ.Add(polyQ, s0b0)
+	polyQ.Mod(polyQ, priv.PublicKey.prime)
 
 	// Explanation:
 	// As:
@@ -270,21 +270,21 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	// ax^2 + bx + c = 0
 
 	a := new(big.Int)
-	revPs := new(big.Int).Sub(priv.PublicKey.prime, fullPS)
-	a.Add(fullQs, revPs)
+	revPs := new(big.Int).Sub(priv.PublicKey.prime, polyP)
+	a.Add(polyQ, revPs)
 	a.Mod(a, priv.PublicKey.prime)
 
 	b := new(big.Int)
-	a1Qs := new(big.Int).Mul(fullQs, priv.a1)
-	b1Ps := new(big.Int).Mul(fullPS, priv.b1)
+	a1Qs := new(big.Int).Mul(polyQ, priv.a1)
+	b1Ps := new(big.Int).Mul(polyP, priv.b1)
 	b1Ps.Mod(b1Ps, priv.PublicKey.prime)
 	revb1Ps := new(big.Int).Sub(priv.PublicKey.prime, b1Ps)
 	b.Add(a1Qs, revb1Ps)
 	b.Mod(b, priv.PublicKey.prime)
 
 	c := new(big.Int)
-	a0Qs := new(big.Int).Mul(fullQs, priv.a0)
-	b0Ps := new(big.Int).Mul(fullPS, priv.b0)
+	a0Qs := new(big.Int).Mul(polyQ, priv.a0)
+	b0Ps := new(big.Int).Mul(polyP, priv.b0)
 	b0Ps.Mod(b0Ps, priv.PublicKey.prime)
 	revb0Ps := new(big.Int).Sub(priv.PublicKey.prime, b0Ps)
 	c.Add(a0Qs, revb0Ps)
