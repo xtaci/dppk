@@ -13,9 +13,10 @@ const PRIME = "32317006071311007300714876688669951960444102669715484032130345427
 //const PRIME = "977"
 
 const (
-	ERRMSG_ORDER               = "order must be at least 5"
-	ERRMSG_NULL_ENCRYPT        = "encrypted values cannot be null"
-	ERRMSG_DATA_EXCEEDED_FIELD = "the secret to encrypt is not in the GF(p)"
+	ERR_MSG_ORDER         = "order must be at least 5"
+	ERR_MSG_NULL_ENCRYPT  = "encrypted values cannot be null"
+	ERR_MSG_DATA_EXCEEDED = "the secret to encrypt is not in the GF(p)"
+	ERR_MSG_VU_PUBLICKEY  = "VU in public key is not equal"
 )
 
 // PrivateKey represents a private key in the DPPK protocol.
@@ -78,7 +79,7 @@ func GenerateKey(order int) (*PrivateKey, error) {
 func generateKey(order int, strPrime string) (*PrivateKey, error) {
 	// Ensure the order is at least 5
 	if order < 5 {
-		return nil, errors.New(ERRMSG_ORDER)
+		return nil, errors.New(ERR_MSG_ORDER)
 	}
 	prime, _ := big.NewInt(0).SetString(strPrime, 10)
 
@@ -170,12 +171,27 @@ RETRY:
 	return priv, nil
 }
 
-// Encrypt encrypts a message using the given public key.
+// Encrypt encrypts a message with the given public key.
 func Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
 	if secret.Cmp(pk.prime) >= 0 {
-		return nil, nil, errors.New(ERRMSG_DATA_EXCEEDED_FIELD)
+		return nil, nil, errors.New(ERR_MSG_DATA_EXCEEDED)
+	}
+
+	if len(pk.vecU) != len(pk.vecV) {
+		return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+	}
+
+	// Ensure the values in the public key are not nil
+	for i := range pk.vecU {
+		if pk.vecU[i] == nil {
+			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+		}
+
+		if pk.vecV[i] == nil {
+			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+		}
 	}
 
 	// Extend the vectors U and Q with a constant term of 1
@@ -215,7 +231,7 @@ func Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 // Decrypt decrypts the encrypted values Ps and Qs using the private key.
 func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
 	if Ps == nil || Qs == nil {
-		return nil, nil, errors.New(ERRMSG_NULL_ENCRYPT)
+		return nil, nil, errors.New(ERR_MSG_NULL_ENCRYPT)
 	}
 	// Add constant term to get full Ps and Qs polynomial
 	fullPS := new(big.Int).Set(Ps)
