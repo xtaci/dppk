@@ -40,27 +40,27 @@ type jsonPublicKey struct {
 }
 
 // MarshalJSON marshals the public key to JSON.
-func (pk *PublicKey) MarshalJSON() ([]byte, error) {
+func (pub *PublicKey) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonPublicKey{
-		Prime:   pk.prime,
-		VectorU: pk.vecU,
-		VectorV: pk.vecV,
+		Prime:   pub.prime,
+		VectorU: pub.vecU,
+		VectorV: pub.vecV,
 	})
 }
 
 // UnmarshalPublicKeyJSON unmarshals a public key from JSON.
 func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
-	pkjson := &jsonPublicKey{}
+	pubToJson := &jsonPublicKey{}
 
-	err := json.Unmarshal(jsontext, pkjson)
+	err := json.Unmarshal(jsontext, pubToJson)
 	if err != nil {
 		return nil, err
 	}
 
 	return &PublicKey{
-		prime: pkjson.Prime,
-		vecU:  pkjson.VectorU,
-		vecV:  pkjson.VectorV,
+		prime: pubToJson.Prime,
+		vecU:  pubToJson.VectorU,
+		vecV:  pubToJson.VectorV,
 	}, nil
 }
 
@@ -172,33 +172,33 @@ RETRY:
 }
 
 // Encrypt encrypts a message with the given public key.
-func Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+func Encrypt(pub *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
-	if secret.Cmp(pk.prime) >= 0 {
+	if secret.Cmp(pub.prime) >= 0 {
 		return nil, nil, errors.New(ERR_MSG_DATA_EXCEEDED)
 	}
 
-	if len(pk.vecU) != len(pk.vecV) {
+	if len(pub.vecU) != len(pub.vecV) {
 		return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 	}
 
 	// Ensure the values in the public key are not nil
-	for i := range pk.vecU {
-		if pk.vecU[i] == nil {
+	for i := range pub.vecU {
+		if pub.vecU[i] == nil {
 			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 
-		if pk.vecV[i] == nil {
+		if pub.vecV[i] == nil {
 			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 	}
 
 	// Extend the vectors U and Q with a constant term of 1
-	vecUExt := make([]*big.Int, len(pk.vecU)+1)
-	vecVExt := make([]*big.Int, len(pk.vecV)+1)
-	copy(vecUExt, pk.vecU)
-	copy(vecVExt, pk.vecV)
+	vecUExt := make([]*big.Int, len(pub.vecU)+1)
+	vecVExt := make([]*big.Int, len(pub.vecV)+1)
+	copy(vecUExt, pub.vecU)
+	copy(vecVExt, pub.vecV)
 	vecUExt[len(vecUExt)-1] = big.NewInt(1)
 	vecVExt[len(vecVExt)-1] = big.NewInt(1)
 
@@ -212,17 +212,17 @@ func Encrypt(pk *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Compute the encrypted values Ps and Qs
 	for i := range vecUExt {
 		UiSi.Mul(Si, vecUExt[i])
-		UiSi.Mod(UiSi, pk.prime)
+		UiSi.Mod(UiSi, pub.prime)
 		Ps.Add(Ps, UiSi)
-		Ps.Mod(Ps, pk.prime)
+		Ps.Mod(Ps, pub.prime)
 
 		ViSi.Mul(Si, vecVExt[i])
-		ViSi.Mod(ViSi, pk.prime)
+		ViSi.Mod(ViSi, pub.prime)
 		Qs.Add(Qs, ViSi)
-		Qs.Mod(Qs, pk.prime)
+		Qs.Mod(Qs, pub.prime)
 
 		Si.Mul(Si, secret)
-		Si.Mod(Si, pk.prime)
+		Si.Mod(Si, pub.prime)
 	}
 
 	return Ps, Qs, nil
@@ -325,6 +325,11 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	x2.Mod(x2, priv.PublicKey.prime)
 
 	return x1, x2, nil
+}
+
+// Public returns the public key of the private key.
+func (priv *PrivateKey) Public() *PublicKey {
+	return &priv.PublicKey
 }
 
 // MarshalJSON marshals the public key to JSON.
