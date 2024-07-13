@@ -49,6 +49,12 @@ type PublicKey struct {
 	VectorV []*big.Int // Coefficients for polynomial V
 }
 
+// KEM represents a Key Encapsulation Mechanism in the DPPK protocol.
+type KEM struct {
+	Ps *big.Int
+	Qs *big.Int
+}
+
 // Equal checks if two public keys are equal.
 func (pub *PublicKey) Equal(other *PublicKey) bool {
 	if len(pub.VectorU) != len(other.VectorU) {
@@ -187,36 +193,36 @@ RETRY:
 }
 
 // encrypt encrypts a message with the given public key and custom prime
-func EncryptWithPrime(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.Int, err error) {
+func EncryptWithPrime(pub *PublicKey, msg []byte, prime *big.Int) (kem *KEM, err error) {
 	return encrypt(pub, msg, prime)
 }
 
 // encrypt encrypts a message with the given public key and default prime
-func Encrypt(pub *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+func Encrypt(pub *PublicKey, msg []byte) (kem *KEM, err error) {
 	prime, _ := big.NewInt(0).SetString(DefaultPrime, 10)
 	return encrypt(pub, msg, prime)
 }
 
 // encrypt encrypts a message with the given public key.
-func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.Int, err error) {
+func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (kem *KEM, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
 	if secret.Cmp(prime) >= 0 {
-		return nil, nil, errors.New(ERR_MSG_DATA_EXCEEDED)
+		return nil, errors.New(ERR_MSG_DATA_EXCEEDED)
 	}
 
 	if len(pub.VectorU) != len(pub.VectorV) {
-		return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+		return nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 	}
 
 	// Ensure the values in the public key are not nil
 	for i := range pub.VectorU {
 		if pub.VectorU[i] == nil {
-			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+			return nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 
 		if pub.VectorV[i] == nil {
-			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
+			return nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 	}
 
@@ -229,8 +235,8 @@ func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.I
 	vecVExt[len(vecVExt)-1] = big.NewInt(1)
 
 	// Initialize variables for the encryption process
-	Ps = big.NewInt(0)
-	Qs = big.NewInt(0)
+	Ps := big.NewInt(0)
+	Qs := big.NewInt(0)
 	Si := new(big.Int).Set(secret)
 	UiSi := new(big.Int)
 	ViSi := new(big.Int)
@@ -251,11 +257,17 @@ func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.I
 		Si.Mod(Si, prime)
 	}
 
-	return Ps, Qs, nil
+	return &KEM{Ps: Ps, Qs: Qs}, nil
 }
 
 // Decrypt decrypts the encrypted values Ps and Qs using the private key.
-func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err error) {
+func (priv *PrivateKey) Decrypt(kem *KEM) (x1, x2 *big.Int, err error) {
+	if kem == nil {
+		return nil, nil, errors.New(ERR_MSG_NULL_ENCRYPT)
+	}
+
+	Ps := kem.Ps
+	Qs := kem.Qs
 	if Ps == nil || Qs == nil {
 		return nil, nil, errors.New(ERR_MSG_NULL_ENCRYPT)
 	}
