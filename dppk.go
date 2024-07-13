@@ -1,4 +1,4 @@
-// Package dppk implements the DPPK protocol.
+// Package dppk implements the Deterministic Polynomial Public Key (DPPK) algorithm.
 //
 // The ancient Vieta’s formulas reveal the relationships
 // between coefficients of an nth-degree polynomial and its roots. It is
