@@ -2,15 +2,12 @@ package dppk
 
 import (
 	"crypto/rand"
-	"encoding/json"
 	"errors"
 	"math/big"
 )
 
-// PRIME is the prime number used in the DPPK protocol.
-const PRIME = "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853611059596231637"
-
-//const PRIME = "977"
+// DefaultPrime is the default prime number used in the DPPK protocol.
+const DefaultPrime = "32317006071311007300714876688669951960444102669715484032130345427524655138867890893197201411522913463688717960921898019494119559150490921095088152386448283120630877367300996091750197750389652106796057638384067568276792218642619756161838094338476170470581645852036305042887575891541065808607552399123930385521914333389668342420684974786564569494856176035326322058077805659331026192708460314150258592864177116725943603718461857357598351152301645904403697613233287231227125684710820209725157101726931323469678542580656697935045997268352998638215525166389437335543602135433229604645318478604952148193555853611059596231637"
 
 const (
 	ERR_MSG_ORDER         = "order must be at least 5"
@@ -21,47 +18,46 @@ const (
 
 // PrivateKey represents a private key in the DPPK protocol.
 type PrivateKey struct {
-	s0             *big.Int // Initial secret value
-	a0, a1, b0, b1 *big.Int // Coefficients for the polynomials
+	S0             *big.Int // Initial secret value
+	A0, A1, B0, B1 *big.Int // Coefficients for the polynomials
+	Prime          *big.Int // Prime number used in this private key
 	PublicKey
 }
 
 // PublicKey represents a public key in the DPPK protocol.
 type PublicKey struct {
-	prime *big.Int   // Prime number used in the protocol
-	vecU  []*big.Int // Coefficients for polynomial U
-	vecV  []*big.Int // Coefficients for polynomial V
+	VectorU []*big.Int // Coefficients for polynomial U
+	VectorV []*big.Int // Coefficients for polynomial V
 }
 
-type jsonPublicKey struct {
-	Prime   *big.Int   `json:"prime"`
-	VectorU []*big.Int `json:"vectorU"`
-	VectorV []*big.Int `json:"vectorV"`
-}
-
-// MarshalJSON marshals the public key to JSON.
-func (pub *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonPublicKey{
-		Prime:   pub.prime,
-		VectorU: pub.vecU,
-		VectorV: pub.vecV,
-	})
-}
-
-// UnmarshalPublicKeyJSON unmarshals a public key from JSON.
-func UnmarshalPublicKeyJSON(jsontext []byte) (*PublicKey, error) {
-	pubToJson := &jsonPublicKey{}
-
-	err := json.Unmarshal(jsontext, pubToJson)
-	if err != nil {
-		return nil, err
+// Equal checks if two public keys are equal.
+func (pub *PublicKey) Equal(other *PublicKey) bool {
+	if len(pub.VectorU) != len(other.VectorU) {
+		return false
 	}
 
-	return &PublicKey{
-		prime: pubToJson.Prime,
-		vecU:  pubToJson.VectorU,
-		vecV:  pubToJson.VectorV,
-	}, nil
+	if len(pub.VectorV) != len(other.VectorV) {
+		return false
+	}
+
+	for i := range pub.VectorU {
+		if pub.VectorU[i].Cmp(other.VectorU[i]) != 0 {
+			return false
+		}
+	}
+
+	for i := range pub.VectorV {
+		if pub.VectorV[i].Cmp(other.VectorV[i]) != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// Order returns the order of the public key.
+func (pub *PublicKey) Order() int {
+	return len(pub.VectorU) - 1
 }
 
 // GenerateKey generates a new DPPK private key with the given order and prime number
@@ -72,7 +68,7 @@ func GenerateKeyWithPrime(order int, prime string) (*PrivateKey, error) {
 
 // GenerateKey generates a new DPPK private key with the given order and default prime number
 func GenerateKey(order int) (*PrivateKey, error) {
-	return generateKey(order, PRIME)
+	return generateKey(order, DefaultPrime)
 }
 
 // GenerateKey generates a new DPPK private key with the given order.
@@ -157,48 +153,59 @@ RETRY:
 
 	// Create the private key
 	priv := &PrivateKey{
-		s0: Bn[0],
-		a0: a0,
-		a1: a1,
-		b0: b0,
-		b1: b1,
+		S0:    Bn[0],
+		A0:    a0,
+		A1:    a1,
+		B0:    b0,
+		B1:    b1,
+		Prime: prime,
 	}
 
 	// Set the public key vectors, excluding the first and last elements
-	priv.PublicKey.vecU = vecU[1 : order+2]
-	priv.PublicKey.vecV = vecV[1 : order+2]
-	priv.PublicKey.prime = prime
+	priv.PublicKey.VectorU = vecU[1 : order+2]
+	priv.PublicKey.VectorV = vecV[1 : order+2]
 	return priv, nil
 }
 
-// Encrypt encrypts a message with the given public key.
+// encrypt encrypts a message with the given public key and custom prime
+func EncryptWithPrime(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.Int, err error) {
+	return encrypt(pub, msg, prime)
+}
+
+// encrypt encrypts a message with the given public key and default prime
 func Encrypt(pub *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
+	prime, _ := big.NewInt(0).SetString(DefaultPrime, 10)
+	return encrypt(pub, msg, prime)
+}
+
+// encrypt encrypts a message with the given public key.
+func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (Ps *big.Int, Qs *big.Int, err error) {
 	// Convert the message to a big integer
 	secret := new(big.Int).SetBytes(msg)
-	if secret.Cmp(pub.prime) >= 0 {
+	if secret.Cmp(prime) >= 0 {
 		return nil, nil, errors.New(ERR_MSG_DATA_EXCEEDED)
 	}
 
-	if len(pub.vecU) != len(pub.vecV) {
+	if len(pub.VectorU) != len(pub.VectorV) {
 		return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 	}
 
 	// Ensure the values in the public key are not nil
-	for i := range pub.vecU {
-		if pub.vecU[i] == nil {
+	for i := range pub.VectorU {
+		if pub.VectorU[i] == nil {
 			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 
-		if pub.vecV[i] == nil {
+		if pub.VectorV[i] == nil {
 			return nil, nil, errors.New(ERR_MSG_VU_PUBLICKEY)
 		}
 	}
 
 	// Extend the vectors U and Q with a constant term of 1
-	vecUExt := make([]*big.Int, len(pub.vecU)+1)
-	vecVExt := make([]*big.Int, len(pub.vecV)+1)
-	copy(vecUExt, pub.vecU)
-	copy(vecVExt, pub.vecV)
+	vecUExt := make([]*big.Int, len(pub.VectorU)+1)
+	vecVExt := make([]*big.Int, len(pub.VectorV)+1)
+	copy(vecUExt, pub.VectorU)
+	copy(vecVExt, pub.VectorV)
 	vecUExt[len(vecUExt)-1] = big.NewInt(1)
 	vecVExt[len(vecVExt)-1] = big.NewInt(1)
 
@@ -212,17 +219,17 @@ func Encrypt(pub *PublicKey, msg []byte) (Ps *big.Int, Qs *big.Int, err error) {
 	// Compute the encrypted values Ps and Qs
 	for i := range vecUExt {
 		UiSi.Mul(Si, vecUExt[i])
-		UiSi.Mod(UiSi, pub.prime)
+		UiSi.Mod(UiSi, prime)
 		Ps.Add(Ps, UiSi)
-		Ps.Mod(Ps, pub.prime)
+		Ps.Mod(Ps, prime)
 
 		ViSi.Mul(Si, vecVExt[i])
-		ViSi.Mod(ViSi, pub.prime)
+		ViSi.Mod(ViSi, prime)
 		Qs.Add(Qs, ViSi)
-		Qs.Mod(Qs, pub.prime)
+		Qs.Mod(Qs, prime)
 
 		Si.Mul(Si, secret)
-		Si.Mod(Si, pub.prime)
+		Si.Mod(Si, prime)
 	}
 
 	return Ps, Qs, nil
@@ -233,21 +240,24 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	if Ps == nil || Qs == nil {
 		return nil, nil, errors.New(ERR_MSG_NULL_ENCRYPT)
 	}
+
+	prime := priv.Prime
+
 	// Add constant term to get full Ps and Qs polynomial
 	polyP := new(big.Int).Set(Ps)
 	polyQ := new(big.Int).Set(Qs)
 
 	s0a0 := new(big.Int)
 	s0b0 := new(big.Int)
-	s0a0.Mul(priv.s0, priv.a0)
-	s0a0.Mod(s0a0, priv.PublicKey.prime)
-	s0b0.Mul(priv.s0, priv.b0)
-	s0b0.Mod(s0b0, priv.PublicKey.prime)
+	s0a0.Mul(priv.S0, priv.A0)
+	s0a0.Mod(s0a0, prime)
+	s0b0.Mul(priv.S0, priv.B0)
+	s0b0.Mod(s0b0, prime)
 
 	polyP.Add(polyP, s0a0)
-	polyP.Mod(polyP, priv.PublicKey.prime)
+	polyP.Mod(polyP, prime)
 	polyQ.Add(polyQ, s0b0)
-	polyQ.Mod(polyQ, priv.PublicKey.prime)
+	polyQ.Mod(polyQ, prime)
 
 	// Explanation:
 	// As:
@@ -270,59 +280,59 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 	// ax^2 + bx + c = 0
 
 	a := new(big.Int)
-	revPs := new(big.Int).Sub(priv.PublicKey.prime, polyP)
+	revPs := new(big.Int).Sub(prime, polyP)
 	a.Add(polyQ, revPs)
-	a.Mod(a, priv.PublicKey.prime)
+	a.Mod(a, priv.Prime)
 
 	b := new(big.Int)
-	a1Qs := new(big.Int).Mul(polyQ, priv.a1)
-	b1Ps := new(big.Int).Mul(polyP, priv.b1)
-	b1Ps.Mod(b1Ps, priv.PublicKey.prime)
-	revb1Ps := new(big.Int).Sub(priv.PublicKey.prime, b1Ps)
+	a1Qs := new(big.Int).Mul(polyQ, priv.A1)
+	b1Ps := new(big.Int).Mul(polyP, priv.B1)
+	b1Ps.Mod(b1Ps, priv.Prime)
+	revb1Ps := new(big.Int).Sub(prime, b1Ps)
 	b.Add(a1Qs, revb1Ps)
-	b.Mod(b, priv.PublicKey.prime)
+	b.Mod(b, priv.Prime)
 
 	c := new(big.Int)
-	a0Qs := new(big.Int).Mul(polyQ, priv.a0)
-	b0Ps := new(big.Int).Mul(polyP, priv.b0)
-	b0Ps.Mod(b0Ps, priv.PublicKey.prime)
-	revb0Ps := new(big.Int).Sub(priv.PublicKey.prime, b0Ps)
+	a0Qs := new(big.Int).Mul(polyQ, priv.A0)
+	b0Ps := new(big.Int).Mul(polyP, priv.B0)
+	b0Ps.Mod(b0Ps, priv.Prime)
+	revb0Ps := new(big.Int).Sub(prime, b0Ps)
 	c.Add(a0Qs, revb0Ps)
-	c.Mod(c, priv.PublicKey.prime)
+	c.Mod(c, priv.Prime)
 
 	// Solve the quadratic equation derived from Ps and Qs
 	// Compute the discriminant of the quadratic equation
 	bsquared := new(big.Int).Mul(b, b)
-	bsquared.Mod(bsquared, priv.PublicKey.prime)
+	bsquared.Mod(bsquared, prime)
 
 	fourac := new(big.Int).Mul(big.NewInt(4), big.NewInt(0).Mul(a, c))
-	fourac.Mod(fourac, priv.PublicKey.prime)
-	invFourac := new(big.Int).Sub(priv.PublicKey.prime, fourac)
+	fourac.Mod(fourac, prime)
+	invFourac := new(big.Int).Sub(prime, fourac)
 
 	squared := big.NewInt(0).Add(bsquared, invFourac)
-	squared.Mod(squared, priv.PublicKey.prime)
+	squared.Mod(squared, prime)
 
 	// Solve the quadratic equation
-	root := new(big.Int).ModSqrt(squared, priv.PublicKey.prime)
+	root := new(big.Int).ModSqrt(squared, prime)
 
 	// Calculate the roots of the equation
 	inv2a := big.NewInt(2)
 	inv2a.Mul(inv2a, a)
-	inv2a.Mod(inv2a, priv.PublicKey.prime)
-	inv2a.ModInverse(inv2a, priv.PublicKey.prime)
+	inv2a.Mod(inv2a, prime)
+	inv2a.ModInverse(inv2a, prime)
 
-	negb := new(big.Int).Sub(priv.PublicKey.prime, b)
+	negb := new(big.Int).Sub(prime, b)
 
-	revRoot := new(big.Int).Sub(priv.PublicKey.prime, root)
+	revRoot := new(big.Int).Sub(prime, root)
 	x1 = big.NewInt(0).Add(negb, revRoot)
-	x1.Mod(x1, priv.PublicKey.prime)
+	x1.Mod(x1, prime)
 	x1.Mul(x1, inv2a)
-	x1.Mod(x1, priv.PublicKey.prime)
+	x1.Mod(x1, prime)
 
 	x2 = big.NewInt(0).Add(negb, root)
-	x2.Mod(x2, priv.PublicKey.prime)
+	x2.Mod(x2, prime)
 	x2.Mul(x2, inv2a)
-	x2.Mod(x2, priv.PublicKey.prime)
+	x2.Mod(x2, prime)
 
 	return x1, x2, nil
 }
@@ -330,66 +340,4 @@ func (priv *PrivateKey) Decrypt(Ps *big.Int, Qs *big.Int) (x1, x2 *big.Int, err 
 // Public returns the public key of the private key.
 func (priv *PrivateKey) Public() *PublicKey {
 	return &priv.PublicKey
-}
-
-// MarshalJSON marshals the public key to JSON.
-func (priv *PrivateKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		S0             *big.Int
-		A0, A1, B0, B1 *big.Int
-		PublicKey      jsonPublicKey
-	}{
-		S0: priv.s0,
-		A0: priv.a0,
-		A1: priv.a1,
-		B0: priv.b0,
-		B1: priv.b1,
-		PublicKey: jsonPublicKey{
-			Prime:   priv.prime,
-			VectorU: priv.vecU,
-			VectorV: priv.vecV,
-		},
-	})
-}
-
-func UnmarshalPrivateKeyJSON(jsontext []byte) (*PrivateKey, error) {
-	privjson := struct {
-		S0             *big.Int
-		A0, A1, B0, B1 *big.Int
-		PublicKey      jsonPublicKey
-	}{}
-
-	err := json.Unmarshal(jsontext, &privjson)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PrivateKey{
-		s0: privjson.S0,
-		a0: privjson.A0,
-		a1: privjson.A1,
-		b0: privjson.B0,
-		b1: privjson.B1,
-		PublicKey: PublicKey{
-			prime: privjson.PublicKey.Prime,
-			vecU:  privjson.PublicKey.VectorU,
-			vecV:  privjson.PublicKey.VectorV,
-		},
-	}, nil
-}
-
-// UnmarshalPrivateKeyWithPrime unmarshals a private key with given prime number
-func UnmarshalPrivateKey(s0, a0, a1, b0, b1 *big.Int, vecU, vecV []*big.Int, prime *big.Int) *PrivateKey {
-	return &PrivateKey{
-		s0: s0,
-		a0: a0,
-		a1: a1,
-		b0: b0,
-		b1: b1,
-		PublicKey: PublicKey{
-			prime: prime,
-			vecU:  vecU,
-			vecV:  vecV,
-		},
-	}
 }

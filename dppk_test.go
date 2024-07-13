@@ -21,6 +21,8 @@ func TestDPPK(t *testing.T) {
 	t.Log("x1:", string(x1.Bytes()))
 	t.Log("x2:", string(x2.Bytes()))
 
+	assert.Equal(t, alice.Public().Order(), 10)
+
 	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
 	assert.True(t, equal)
 }
@@ -42,29 +44,6 @@ func TestDPPKSmallPrime(t *testing.T) {
 
 	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
 	assert.True(t, equal)
-}
-
-func TestMarshalPublicKey(t *testing.T) {
-	dppk, _ := GenerateKey(5)
-	bts, err := dppk.PublicKey.MarshalJSON()
-	assert.Nil(t, err)
-	t.Log(string(bts))
-
-	pk, err := UnmarshalPublicKeyJSON(bts)
-	assert.Nil(t, err)
-	assert.Equal(t, dppk.PublicKey, *pk)
-}
-
-func TestMarshalPrivateKey(t *testing.T) {
-	dppk, _ := GenerateKey(5)
-	bts, err := dppk.MarshalJSON()
-	assert.Nil(t, err)
-	t.Log(string(bts))
-
-	priv, err := UnmarshalPrivateKeyJSON(bts)
-	assert.Nil(t, err)
-	assert.Equal(t, dppk, priv)
-
 }
 
 func BenchmarkDPPKEncrypt(b *testing.B) {
