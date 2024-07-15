@@ -52,12 +52,10 @@ The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formula
 - **Deterministic Time Complexity**:
   - **Classical Attacks**: $O(\sqrt{p})$ (super-exponential difficulty).
   - **Quantum Attacks**: $O(p)$ (exponential difficulty).
-
-- **Comparison with PQC Algorithms**: DPPK demonstrates a higher security level with a complexity $O(\sqrt{p})$ for secret key extraction, offering the same security level as AES-256.
   
 ## Installation
 To install DPPK, use:
-```
+```console
 go get -u github.com/xtaci/dppk
 ```
 
