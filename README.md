@@ -1,7 +1,5 @@
 # DPPK
-
-![image](https://github.com/xtaci/dppk/assets/2346725/33680bad-7a91-48a8-ad56-fbd3ac96aeaf)
-
+![image](https://github.com/user-attachments/assets/d396d009-1f62-4273-af48-869e388c3445)
 
 [![GoDoc][1]][2] [![Go Report Card][3]][4]
 
@@ -31,11 +29,11 @@ The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formula
 
 - By only publishing the coefficients of the polynomials without their constant terms, polynomial factoring techniques for private key extraction are greatly restricted.
 - The time complexity for private key extraction from the public key is:
-  - **Classical Attacks**: Super-exponential difficulty \(O(p^2)\).
-  - **Quantum Attacks**: Exponential difficulty \(O(p)\).
+  - **Classical Attacks**: Super-exponential difficulty $O(p^2)$.
+  - **Quantum Attacks**: Exponential difficulty $O(p)$.
 - In comparison, the complexity for the Polynomial Factoring Problem (PFP) is:
-  - **Classical Attacks**: \(O(np^{1/2})\).
-  - **Quantum Attacks**: \(O(p^{1/2})\), matching the complexity level of Grover’s search algorithm.
+  - **Classical Attacks**: $O(n\sqrt{p})$.
+  - **Quantum Attacks**: $O(\sqrt{p})$, matching the complexity level of Grover’s search algorithm.
 
 # Practical Implementation and Performance
 
@@ -43,37 +41,108 @@ The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formula
 
 - The central idea for keypair construction arises from Vieta’s formulas by decoupling the coefficients of a polynomial into two categories:
   - **Private**: From its constant term.
-  - **Public**: From the coefficients of the indeterminate \(x\).
+  - **Public**: From the coefficients of the indeterminate $x$.
 
-- DPPK uses two entangled generic polynomials based on a common base polynomial \(B_n(x)\) with two solvable polynomials \(u(x)\) and \(v(x)\):
+- DPPK uses two entangled generic polynomials based on a common base polynomial $B_n(x)$ with two solvable polynomials $u(x)$ and $v(x)$:
   - **Public Key**: All coefficients of the entangled polynomials.
   - **Private Key**: Their constant terms and the two solvable polynomials.
 
 ## Security Analysis
 
 - **Deterministic Time Complexity**:
-  - **Classical Attacks**: \(O(p^2)\) (super-exponential difficulty).
-  - **Quantum Attacks**: \(O(p)\) (exponential difficulty).
+  - **Classical Attacks**: $O(\sqrt{p})$ (super-exponential difficulty).
+  - **Quantum Attacks**: $O(p)$ (exponential difficulty).
 
-- **Comparison with PQC Algorithms**: DPPK demonstrates a higher security level with a complexity \(O(p^{1/2})\) for secret key extraction, offering the same security level as AES-256.
+- **Comparison with PQC Algorithms**: DPPK demonstrates a higher security level with a complexity $O(\sqrt{p})$ for secret key extraction, offering the same security level as AES-256.
+  
+## Installation
+To install DPPK, use:
+```
+go get -u github.com/xtaci/dppk
+```
 
-# Usage
-```golang
-func TestDPPK(t *testing.T) {
-	alice, err := GenerateKey(10)
-	assert.Nil(t, err)
+## Examples
+#### Keypair Generation
+```go
+package main
 
-	secret := []byte("hello quantum")
-	Ps, Qs, err := Encrypt(&alice.PublicKey, secret)
-	assert.Nil(t, err)
-	t.Log("secret:", string(secret))
+import (
+    "github.com/xtaci/dppk"
+    "log"
+)
 
-	x1, x2, err := alice.Decrypt(Ps, Qs)
-	assert.Nil(t, err)
-	t.Log("x1:", string(x1.Bytes()))
-	t.Log("x2:", string(x2.Bytes()))
+func main() {
+    // Generate key for Alice
+    alice, err := dppk.GenerateKey(10)
+    if err != nil {
+        log.Fatal(err)
+    }
 
-	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
-	assert.True(t, equal)
+    // Generate key for Bob
+    bob, err := dppk.GenerateKey(10)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Alice's Public Key:", alice.PublicKey)
+    log.Println("Bob's Public Key:", bob.PublicKey)
+}
+
+```
+
+#### Encryption
+```go
+package main
+
+import (
+    "github.com/xtaci/dppk"
+    "log"
+    "math/big"
+)
+
+func main() {
+    // Assume alice and bob have already generated their keys
+    alice, _ := dppk.GenerateKey(10)
+    bob, _ := dppk.GenerateKey(10)
+
+    // Secret message
+    secret := new(big.Int).SetBytes([]byte("hello quantum"))
+
+    // Bob encrypts the message for Alice
+    kem, err := bob.Encrypt(&alice.PublicKey, secret)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Printf("KEM: %+v\n", kem)
+}
+
+```
+
+#### Decryption
+```go
+package main
+
+import (
+    "github.com/xtaci/dppk"
+    "log"
+)
+
+func main() {
+    // Assume alice and bob have already generated their keys and bob has encrypted a message
+    alice, _ := dppk.GenerateKey(10)
+    bob, _ := dppk.GenerateKey(10)
+    secret := new(big.Int).SetBytes([]byte("hello quantum"))
+    kem, _ := bob.Encrypt(&alice.PublicKey, secret)
+
+    // Alice decrypts the message
+    x1, x2, err := alice.Decrypt(kem)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    log.Println("Decrypted message x1:", x1)
+    log.Println("Decrypted message x2:", x2)
 }
 ```
+
