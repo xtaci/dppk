@@ -144,3 +144,18 @@ func main() {
 }
 ```
 
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request for any improvements, bug fixes, or additional features.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## References
+
+For more detailed information, please refer to the [research paper](https://www.researchgate.net/profile/Randy-Kuang/publication/358101087_A_Deterministic_Polynomial_Public_Key_Algorithm_over_a_Prime_Galois_Field_GFp/links/61f95ff44393577abe055af7/A-Deterministic-Polynomial-Public-Key-Algorithm-over-a-Prime-Galois-Field-GFp.pdf).
+
+## Acknowledgments
+
+Special thanks to the authors of the research paper for their groundbreaking work on HPPK and its applications in KEM and DS.
