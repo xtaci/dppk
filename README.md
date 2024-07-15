@@ -158,4 +158,4 @@ For more detailed information, please refer to the [research paper](https://www.
 
 ## Acknowledgments
 
-Special thanks to the authors of the research paper for their groundbreaking work on HPPK and its applications in KEM and DS.
+Special thanks to the authors of the research paper for their groundbreaking work on DPPK.
