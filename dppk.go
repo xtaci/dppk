@@ -98,7 +98,7 @@ func generateKey(order int, strPrime string) (*PrivateKey, error) {
 	if order < 5 {
 		return nil, errors.New(ERR_MSG_ORDER)
 	}
-	prime, _ := big.NewInt(0).SetString(strPrime, 10)
+	prime, _ := big.NewInt(0).SetString(strPrime, 0)
 
 RETRY:
 	// Generate random coefficients for the polynomials
@@ -195,7 +195,7 @@ func EncryptWithPrime(pub *PublicKey, msg []byte, prime *big.Int) (kem *KEM, err
 
 // encrypt encrypts a message with the given public key and default prime
 func Encrypt(pub *PublicKey, msg []byte) (kem *KEM, err error) {
-	prime, _ := big.NewInt(0).SetString(DefaultPrime, 10)
+	prime, _ := big.NewInt(0).SetString(DefaultPrime, 0)
 	return encrypt(pub, msg, prime)
 }
 
