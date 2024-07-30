@@ -1,4 +1,3 @@
-# DPPK
 ![348676962-d396d009-1f62-4273-af48-869e388c3445](https://github.com/user-attachments/assets/48f97544-64fe-463d-8984-d584e91ca9d2)
 
 [![GoDoc][1]][2] [![Go Report Card][3]][4]
@@ -12,11 +11,11 @@
 
 DPPK is an [Key encapsulation mechanism](https://en.wikipedia.org/wiki/Key_encapsulation_mechanism), a.k.a. - KEM
 
-# Overview
+## Overview
 
 The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formulas) reveal the relationships between the coefficients of an nth-degree polynomial and its roots. It has been surprisingly found that there exists a hidden secret for a potential public key exchange: decoupling the product of all roots (or the constant term) from the summations of root products (or coefficients) of a polynomial to establish a keypair.
 
-# Proposed Algorithm: Deterministic Polynomial Public Key (DPPK)
+# Deterministic Polynomial Public Key (DPPK)
 
 ## Key Principles
 
@@ -34,8 +33,6 @@ The ancient [Vieta’s formulas](https://en.wikipedia.org/wiki/Vieta%27s_formula
 - In comparison, the complexity for the Polynomial Factoring Problem (PFP) is:
   - **Classical Attacks**: $O(n\sqrt{p})$.
   - **Quantum Attacks**: $O(\sqrt{p})$, matching the complexity level of Grover’s search algorithm.
-
-# Practical Implementation and Performance
 
 ## Keypair Generation and Encryption/Decryption
 
