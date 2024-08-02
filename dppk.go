@@ -350,6 +350,15 @@ func (priv *PrivateKey) Decrypt(kem *KEM) (x1, x2 *big.Int, err error) {
 
 	negb := new(big.Int).Sub(prime, b)
 
+	// Solve the quadratic equation:
+	//
+	//          -b + sqrt(b^2 - 4ac)
+	//   x1 =   ---------------------
+	//                  2a
+	//
+	//          -b - sqrt(b^2 - 4ac)
+	//   x2 =   ---------------------
+	//                  2a
 	revRoot := new(big.Int).Sub(prime, root)
 	x1 = big.NewInt(0).Add(negb, revRoot)
 	x1.Mod(x1, prime)
