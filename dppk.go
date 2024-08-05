@@ -31,16 +31,26 @@ const (
 	ERR_MSG_VU_PUBLICKEY  = "VU in public key is not equal"
 )
 
+// defaultPrime is the prime number used in cryptographic operations.
+var defaultPrime *big.Int
+var (
+	errInvalidPrime = errors.New("Invalid Prime")
+)
+
+func init() {
+	defaultPrime, _ = new(big.Int).SetString(DefaultPrime, 0)
+}
+
 // PrivateKey represents a private key in the DPPK protocol.
 type PrivateKey struct {
 	S0             *big.Int // Initial secret value
 	A0, A1, B0, B1 *big.Int // Coefficients for the polynomials
-	Prime          *big.Int // Prime number used in this private key
 	PublicKey
 }
 
 // PublicKey represents a public key in the DPPK protocol.
 type PublicKey struct {
+	Prime   *big.Int
 	VectorU []*big.Int // Coefficients for polynomial U
 	VectorV []*big.Int // Coefficients for polynomial V
 }
@@ -83,22 +93,25 @@ func (pub *PublicKey) Order() int {
 
 // GenerateKey generates a new DPPK private key with the given order and prime number
 // the prime number is a string formatted in base 10
-func GenerateKeyWithPrime(order int, prime string) (*PrivateKey, error) {
-	return generateKey(order, prime)
+func GenerateKeyWithPrime(order int, strPrime string) (*PrivateKey, error) {
+	customPrime, ok := big.NewInt(0).SetString(strPrime, 0)
+	if !ok {
+		return nil, errInvalidPrime
+	}
+	return generateKey(order, customPrime)
 }
 
 // GenerateKey generates a new DPPK private key with the given order and default prime number
 func GenerateKey(order int) (*PrivateKey, error) {
-	return generateKey(order, DefaultPrime)
+	return generateKey(order, defaultPrime)
 }
 
 // GenerateKey generates a new DPPK private key with the given order.
-func generateKey(order int, strPrime string) (*PrivateKey, error) {
+func generateKey(order int, prime *big.Int) (*PrivateKey, error) {
 	// Ensure the order is at least 5
 	if order < 5 {
 		return nil, errors.New(ERR_MSG_ORDER)
 	}
-	prime, _ := big.NewInt(0).SetString(strPrime, 0)
 
 RETRY:
 	// Generate random coefficients for the polynomials
@@ -174,29 +187,23 @@ RETRY:
 
 	// Create the private key
 	priv := &PrivateKey{
-		S0:    Bn[0],
-		A0:    a0,
-		A1:    a1,
-		B0:    b0,
-		B1:    b1,
-		Prime: prime,
+		S0: Bn[0],
+		A0: a0,
+		A1: a1,
+		B0: b0,
+		B1: b1,
 	}
 
 	// Set the public key vectors, excluding the first and last elements
+	priv.Prime = prime
 	priv.PublicKey.VectorU = vecU[1 : order+2]
 	priv.PublicKey.VectorV = vecV[1 : order+2]
 	return priv, nil
 }
 
-// encrypt encrypts a message with the given public key and custom prime
-func EncryptWithPrime(pub *PublicKey, msg []byte, prime *big.Int) (kem *KEM, err error) {
-	return encrypt(pub, msg, prime)
-}
-
-// encrypt encrypts a message with the given public key and default prime
+// encrypt encrypts a message with the given public key and the prime specified in public key
 func Encrypt(pub *PublicKey, msg []byte) (kem *KEM, err error) {
-	prime, _ := big.NewInt(0).SetString(DefaultPrime, 0)
-	return encrypt(pub, msg, prime)
+	return encrypt(pub, msg, pub.Prime)
 }
 
 // encrypt encrypts a message with the given public key.
