@@ -1,5 +1,3 @@
-![348676962-d396d009-1f62-4273-af48-869e388c3445](https://github.com/user-attachments/assets/48f97544-64fe-463d-8984-d584e91ca9d2)
-
 [![GoDoc][1]][2] [![Go Report Card][3]][4] [![CreatedAt][5]][6] 
 
 [1]: https://godoc.org/github.com/xtaci/dppk?status.svg
