@@ -93,7 +93,6 @@ package main
 import (
     "github.com/xtaci/dppk"
     "log"
-    "math/big"
 )
 
 func main() {
@@ -102,10 +101,10 @@ func main() {
     bob, _ := dppk.GenerateKey(10)
 
     // Secret message
-    secret := new(big.Int).SetBytes([]byte("hello quantum"))
+    secret := []byte("hello quantum")
 
     // Bob encrypts the message for Alice
-    kem, err := bob.Encrypt(&alice.PublicKey, secret)
+    kem, err := dppk.Encrypt(&alice.PublicKey, secret)
     if err != nil {
         log.Fatal(err)
     }
@@ -128,17 +127,16 @@ func main() {
     // Assume alice and bob have already generated their keys and bob has encrypted a message
     alice, _ := dppk.GenerateKey(10)
     bob, _ := dppk.GenerateKey(10)
-    secret := new(big.Int).SetBytes([]byte("hello quantum"))
-    kem, _ := bob.Encrypt(&alice.PublicKey, secret)
+    secret := []byte("hello quantum")
+    kem, _ := dppk.Encrypt(&alice.PublicKey, secret)
 
     // Alice decrypts the message
-    x1, x2, err := alice.Decrypt(kem)
+    plaintext, err := alice.DecryptMessage(kem)
     if err != nil {
         log.Fatal(err)
     }
 
-    log.Println("Decrypted message x1:", x1)
-    log.Println("Decrypted message x2:", x2)
+    log.Println("Recovered message:", string(plaintext))
 }
 ```
 

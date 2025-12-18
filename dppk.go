@@ -31,10 +31,15 @@ const (
 	ERR_MSG_VU_PUBLICKEY  = "VU in public key is not equal"
 )
 
+const secretMarker byte = 0x01
+
 // defaultPrime is the prime number used in cryptographic operations.
 var defaultPrime *big.Int
 var (
-	errInvalidPrime = errors.New("Invalid Prime")
+	errInvalidPrime        = errors.New("Invalid Prime")
+	errNoQuadraticResidue  = errors.New("ciphertext is not a quadratic residue")
+	errSingularQuadratic   = errors.New("no modular inverse for quadratic coefficient")
+	errInvalidSecretFormat = errors.New("invalid secret encoding")
 )
 
 func init() {
@@ -63,6 +68,18 @@ type KEM struct {
 
 // Equal checks if two public keys are equal.
 func (pub *PublicKey) Equal(other *PublicKey) bool {
+	if pub == nil || other == nil {
+		return false
+	}
+
+	if (pub.Prime == nil) != (other.Prime == nil) {
+		return false
+	}
+
+	if pub.Prime != nil && pub.Prime.Cmp(other.Prime) != 0 {
+		return false
+	}
+
 	if len(pub.VectorU) != len(other.VectorU) {
 		return false
 	}
@@ -202,6 +219,14 @@ RETRY:
 }
 
 // encrypt encrypts a message with the given public key and the prime specified in public key
+
+func encodeSecret(msg []byte) []byte {
+	encoded := make([]byte, len(msg)+1)
+	encoded[0] = secretMarker
+	copy(encoded[1:], msg)
+	return encoded
+}
+
 func Encrypt(pub *PublicKey, msg []byte) (kem *KEM, err error) {
 	return encrypt(pub, msg, pub.Prime)
 }
@@ -209,7 +234,7 @@ func Encrypt(pub *PublicKey, msg []byte) (kem *KEM, err error) {
 // encrypt encrypts a message with the given public key.
 func encrypt(pub *PublicKey, msg []byte, prime *big.Int) (kem *KEM, err error) {
 	// Convert the message to a big integer
-	secret := new(big.Int).SetBytes(msg)
+	secret := new(big.Int).SetBytes(encodeSecret(msg))
 	if secret.Cmp(prime) >= 0 {
 		return nil, errors.New(ERR_MSG_DATA_EXCEEDED)
 	}
@@ -348,12 +373,17 @@ func (priv *PrivateKey) Decrypt(kem *KEM) (x1, x2 *big.Int, err error) {
 
 	// Solve the quadratic equation
 	root := new(big.Int).ModSqrt(squared, prime)
+	if root == nil {
+		return nil, nil, errNoQuadraticResidue
+	}
 
 	// Calculate the roots of the equation
-	inv2a := big.NewInt(2)
-	inv2a.Mul(inv2a, a)
-	inv2a.Mod(inv2a, prime)
-	inv2a.ModInverse(inv2a, prime)
+	doubleA := new(big.Int).Mul(big.NewInt(2), a)
+	doubleA.Mod(doubleA, prime)
+	inv2a := new(big.Int).ModInverse(doubleA, prime)
+	if inv2a == nil {
+		return nil, nil, errSingularQuadratic
+	}
 
 	negb := new(big.Int).Sub(prime, b)
 
@@ -378,6 +408,42 @@ func (priv *PrivateKey) Decrypt(kem *KEM) (x1, x2 *big.Int, err error) {
 	x2.Mod(x2, prime)
 
 	return x1, x2, nil
+}
+
+// DecryptMessage returns the plaintext message embedded in the ciphertext.
+// It tries both candidate roots and returns the first one that matches the
+// expected secret encoding marker.
+func (priv *PrivateKey) DecryptMessage(kem *KEM) ([]byte, error) {
+	x1, x2, err := priv.Decrypt(kem)
+	if err != nil {
+		return nil, err
+	}
+
+	if msg, err := RecoverMessage(x1); err == nil {
+		return msg, nil
+	}
+
+	if msg, err := RecoverMessage(x2); err == nil {
+		return msg, nil
+	}
+
+	return nil, errInvalidSecretFormat
+}
+
+// RecoverMessage converts a decrypted root into the original plaintext.
+func RecoverMessage(candidate *big.Int) ([]byte, error) {
+	if candidate == nil {
+		return nil, errInvalidSecretFormat
+	}
+
+	raw := candidate.Bytes()
+	if len(raw) == 0 || raw[0] != secretMarker {
+		return nil, errInvalidSecretFormat
+	}
+
+	msg := make([]byte, len(raw)-1)
+	copy(msg, raw[1:])
+	return msg, nil
 }
 
 // Public returns the public key of the private key.

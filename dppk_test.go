@@ -31,6 +31,10 @@ func TestDPPK(t *testing.T) {
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
+	message, err := alice.DecryptMessage(kem)
+	assert.Nil(t, err)
+	assert.Equal(t, secret, message)
+
 	x1, x2, err := alice.Decrypt(kem)
 	assert.Nil(t, err)
 	t.Log("x1:", string(x1.Bytes()))
@@ -38,7 +42,9 @@ func TestDPPK(t *testing.T) {
 
 	assert.Equal(t, alice.Public().Order(), 10)
 
-	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
+	decoded1, err1 := RecoverMessage(x1)
+	decoded2, err2 := RecoverMessage(x2)
+	equal := (err1 == nil && bytes.Equal(secret, decoded1)) || (err2 == nil && bytes.Equal(secret, decoded2))
 	assert.True(t, equal)
 }
 
@@ -52,13 +58,32 @@ func TestDPPKSmallPrime(t *testing.T) {
 	assert.Nil(t, err)
 	t.Log("secret:", string(secret))
 
+	message, err := alice.DecryptMessage(kem)
+	assert.Nil(t, err)
+	assert.Equal(t, secret, message)
+
 	x1, x2, err := alice.Decrypt(kem)
 	assert.Nil(t, err)
 	t.Log("x1:", string(x1.Bytes()))
 	t.Log("x2:", string(x2.Bytes()))
 
-	equal := bytes.Equal(secret, x1.Bytes()) || bytes.Equal(secret, x2.Bytes())
+	decoded1, err1 := RecoverMessage(x1)
+	decoded2, err2 := RecoverMessage(x2)
+	equal := (err1 == nil && bytes.Equal(secret, decoded1)) || (err2 == nil && bytes.Equal(secret, decoded2))
 	assert.True(t, equal)
+}
+
+func TestDPPKLeadingZeros(t *testing.T) {
+	alice, err := GenerateKey(10)
+	assert.Nil(t, err)
+
+	secret := []byte{0x00, 0x00, 0x42, 0x10}
+	kem, err := Encrypt(&alice.PublicKey, secret)
+	assert.Nil(t, err)
+
+	message, err := alice.DecryptMessage(kem)
+	assert.Nil(t, err)
+	assert.Equal(t, secret, message)
 }
 
 func BenchmarkDPPKEncrypt(b *testing.B) {
