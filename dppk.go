@@ -31,7 +31,7 @@ const (
 	ERR_MSG_VU_PUBLICKEY  = "VU in public key is not equal"
 )
 
-const secretMarker byte = 0x01
+const secretMarker = "\x5f\x37\x59\xdf"
 
 // defaultPrime is the prime number used in cryptographic operations.
 var defaultPrime *big.Int
@@ -221,9 +221,9 @@ RETRY:
 // encrypt encrypts a message with the given public key and the prime specified in public key
 
 func encodeSecret(msg []byte) []byte {
-	encoded := make([]byte, len(msg)+1)
-	encoded[0] = secretMarker
-	copy(encoded[1:], msg)
+	encoded := make([]byte, len(msg)+len(secretMarker))
+	copy(encoded, secretMarker)
+	copy(encoded[len(secretMarker):], msg)
 	return encoded
 }
 
@@ -437,12 +437,12 @@ func RecoverMessage(candidate *big.Int) ([]byte, error) {
 	}
 
 	raw := candidate.Bytes()
-	if len(raw) == 0 || raw[0] != secretMarker {
+	if len(raw) < len(secretMarker) || string(raw[:len(secretMarker)]) != secretMarker {
 		return nil, errInvalidSecretFormat
 	}
 
-	msg := make([]byte, len(raw)-1)
-	copy(msg, raw[1:])
+	msg := make([]byte, len(raw)-len(secretMarker))
+	copy(msg, raw[len(secretMarker):])
 	return msg, nil
 }
 

@@ -49,7 +49,7 @@ func TestDPPK(t *testing.T) {
 }
 
 func TestDPPKSmallPrime(t *testing.T) {
-	prime := "977"
+	prime := "18446744073709551557"
 	alice, err := GenerateKeyWithPrime(10, prime)
 	assert.Nil(t, err)
 
