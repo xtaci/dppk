@@ -7,6 +7,7 @@
 [5]: https://img.shields.io/github/created-at/xtaci/dppk
 [6]: https://img.shields.io/github/created-at/xtaci/dppk
 
+English | [简体中文](README.zh-CN.md)
 
 [A Deterministic Polynomial Public Key Algorithm over a Prime Galois Field GF(p)](https://www.researchgate.net/profile/Randy-Kuang/publication/358101087_A_Deterministic_Polynomial_Public_Key_Algorithm_over_a_Prime_Galois_Field_GFp/links/61f95ff44393577abe055af7/A-Deterministic-Polynomial-Public-Key-Algorithm-over-a-Prime-Galois-Field-GFp.pdf)
 
